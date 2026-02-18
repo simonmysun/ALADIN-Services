@@ -46,7 +46,7 @@ RUN mkdir -p /var/log/supervisor
 # NEO4J_PASSWORD has a default, but should be supplied at runtime.
 ENV APP_ENV=production \
     NEO4J_URI=bolt://localhost:7687 \
-    NEO4J_USERNAME=neo4j
+    NEO4J_USERNAME=neo4j \
     NEO4J_PASSWORD=graph_rewriting
 
 
