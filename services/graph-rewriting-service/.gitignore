@@ -1,0 +1,12 @@
+
+# Server
+/node_modules
+/dist/*
+/neo4j_db/*
+
+# Test suite coverage & result reports
+/test/coverage/*
+/test/results/*
+
+.env
+.env.local

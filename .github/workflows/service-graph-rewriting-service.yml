@@ -1,0 +1,83 @@
+name: graph-rewriting-service
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'services/graph-rewriting-service/**'
+      - 'packages/typescript/**'
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'services/graph-rewriting-service/**'
+      - 'packages/typescript/**'
+
+defaults:
+  run:
+    working-directory: services/graph-rewriting-service
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: services/graph-rewriting-service/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Prettier
+        run: npm run prettier
+      - name: ESLint
+        run: npm run lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: services/graph-rewriting-service/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm run test
+      - name: Test summary
+        uses: test-summary/action@v2
+        with:
+          paths: services/graph-rewriting-service/test/results/junit-report.xml
+        if: always()
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-graph-rewriting-service
+          path: services/graph-rewriting-service/test/coverage/
+        if: always()
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: services/graph-rewriting-service/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-graph-rewriting-service
+          path: services/graph-rewriting-service/dist/

@@ -15,3 +15,16 @@ quote_type = single
 max_line_length = off
 trim_trailing_whitespace = false
 
+# Python conventionally uses 4 spaces
+[*.py]
+indent_style = space
+indent_size = 4
+
+# YAML requires spaces
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Makefiles require tabs
+[Makefile]
+indent_style = tab
