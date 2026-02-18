@@ -1,5 +1,5 @@
 {
-	"name": "graph-rewiriting-service",
+	"name": "graph-rewriting-service",
 	"version": "1.0.0",
 	"author": "Sonja Hartl",
 	"description": "",
@@ -10,7 +10,7 @@
 		"dev:debug": "NODE_ENV=development tsx watch --inspect-brk --clear-screen=false src/index.ts",
 		"start": "node dist/index.js",
 		"test": "vitest --coverage",
-		"generate:openapi": "npx fastify generate-swagger src/app.ts",
+		"generate:openapi": "NODE_ENV=test tsx scripts/generate-openapi.ts",
 		"prettier": "npx prettier . --check",
 		"prettier-watch": "onchange \"**/*\" -- prettier --write --ignore-unknown {{changed}}",
 		"lint": "npx eslint .",
@@ -43,7 +43,6 @@
 		"@fastify/swagger": "^9.4.2",
 		"@fastify/swagger-ui": "^5.2.1",
 		"fastify": "^5.2.1",
-		"fastify-cli": "^7.4.1",
 		"fastify-plugin": "^5.0.1",
 		"graphology": "^0.26.0",
 		"graphology-types": "^0.24.8",

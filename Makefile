@@ -2,7 +2,7 @@ SERVICES := $(wildcard services/*)
 PACKAGES := $(wildcard packages/*/*)
 ALL := $(SERVICES) $(PACKAGES)
 
-.PHONY: prep build test lint clean help
+.PHONY: prep build test lint clean generate-openapi docker-build help
 
 ## prep: Prep all services and packages
 prep:
@@ -23,6 +23,14 @@ lint:
 ## clean: Clean build artifacts for all services and packages
 clean:
 	for dir in $(ALL); do $(MAKE) -C $$dir clean || exit 1; done
+
+## generate-openapi: Generate OpenAPI spec for all services
+generate-openapi:
+	for dir in $(ALL); do $(MAKE) -C $$dir generate-openapi || exit 1; done
+
+## docker-build: Build Docker images for all services
+docker-build:
+	for dir in $(ALL); do $(MAKE) -C $$dir docker-build || exit 1; done
 
 ## help: Print this help message
 help:

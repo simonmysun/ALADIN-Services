@@ -1,4 +1,4 @@
-.PHONY: build test lint start clean compile-schemas
+.PHONY: build test lint start clean compile-schemas generate-openapi docker-build
 
 prep:
 	npm i
@@ -22,3 +22,9 @@ clean:
 
 compile-schemas:
 	npm run compile-schemas
+
+generate-openapi:
+	npm run generate:openapi
+
+docker-build:
+	docker build -t graph-rewriting-service .
