@@ -78,6 +78,7 @@ export class GraphTransformationService {
 				}
 
 				await this.executeRule(ruleConfig, processStep);
+				logger.info(`rule executed`);
 			}
 		} else {
 			// If no sequence config is given, run and replace only the first match
@@ -272,7 +273,7 @@ export class GraphTransformationService {
 			replacementGraph
 		);
 
-		this.updateHistory();
+		await this.updateHistory();
 	}
 
 	private async performInstantiationAndReplacement(

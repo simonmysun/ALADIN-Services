@@ -37,9 +37,13 @@ describe('Integration tests for graph service with testcontainers', () => {
 
 	beforeEach(async () => {
 		session = driver.session();
+		// Prevent the service from closing the shared session mid-test;
+		// afterEach is responsible for the real close.
+		vi.spyOn(session, 'close').mockResolvedValue(undefined);
 	});
 
 	afterEach(async () => {
+		vi.restoreAllMocks();
 		// Delete all nodes & relationships
 		await session.run(`MATCH (n) CALL (n) { DETACH DELETE n } IN TRANSACTIONS`);
 		// Drop all indexes & constraints
@@ -86,7 +90,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				},
 			];
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 
 			for (let index = 0; index < testProperties.length; index++) {
 				const neo4jSpy = vi.spyOn(session, 'executeWrite');
@@ -113,7 +117,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 		}, 10000);
 
 		test('Test createNode should fail for duplicate key', async () => {
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeWrite');
 
 			await graphService.createNode({ hello: 'world' }, 'testnode1');
@@ -134,7 +138,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				`CREATE (n:Node {label: 'Test', _grs_internalId: 'testnode1'})`
 			);
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeRead');
 			const result = await graphService.getNode('testnode1');
 			expect(result).toEqual({
@@ -154,7 +158,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 			);
 
 			// Setup test
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const updatedNodeData = {
 				metadata: {
 					label: null,
@@ -192,7 +196,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				props
 			);
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeRead');
 			const result = await graphService.getAllNodes();
 
@@ -237,7 +241,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				props
 			);
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeWrite');
 			const result = await graphService.deleteNode('testnodeA');
 			// Check result
@@ -275,7 +279,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				props
 			);
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeWrite');
 			const result = await graphService.deleteNodes(['testnodeA', 'testnodeB']);
 			// Check result
@@ -320,7 +324,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				props
 			);
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'run');
 			const result = await graphService.deleteAllNodes();
 			// Check result
@@ -347,7 +351,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				props
 			);
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeWrite');
 			const result = await graphService.createEdge(
 				'testnodeA',
@@ -389,7 +393,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				props
 			);
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			await graphService.createEdge('testnodeA', 'testnodeB', 'testrelation', {
 				type: 'relation',
 				hello: 'world',
@@ -418,7 +422,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 		AND b._grs_internalId = 'testnodeB' \
 		CREATE (a)-[r:\`_grs_relationship\` {_grs_internalId: 'testedge', _grs_source: 'testnodeA', _grs_target: 'testnodeB', hello: 'world'}]->(b) RETURN r`);
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeRead');
 			const result = await graphService.getEdge('testedge');
 			expect(result).toEqual({
@@ -450,7 +454,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 			AND b._grs_internalId = 'testnodeB' \
 			CREATE (a)-[r:\`GRS_relationship\` {_grs_internalId: 'testedge', _grs_source: 'testnodeA', _grs_target: 'testnodeB', hello: 'world'}]->(b) RETURN r`);
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeWrite');
 			const result = await graphService.deleteEdge('testedge');
 			// Check result
@@ -499,7 +503,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				edgesProps
 			);
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeWrite');
 			const result = await graphService.deleteEdges(['testedge1', 'testedge2']);
 			// Check result
@@ -579,7 +583,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				},
 			];
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeRead');
 			const result = await graphService.findPatternMatch(patternNodes, []);
 			expect(neo4jSpy).toHaveBeenCalled();
@@ -629,7 +633,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				},
 			];
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeRead');
 			const result = await graphService.findPatternMatch(patternNodes, []);
 			expect(neo4jSpy).toHaveBeenCalled();
@@ -707,7 +711,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				},
 			];
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeRead');
 			const result = await graphService.findPatternMatch([], patternEdges);
 			expect(neo4jSpy).toHaveBeenCalled();
@@ -820,7 +824,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				},
 			];
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeRead');
 			const result = await graphService.findPatternMatch(
 				patternNodes,
@@ -957,7 +961,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				},
 			];
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeRead');
 			const result = await graphService.findPatternMatch(
 				patternNodes,
@@ -1132,7 +1136,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				},
 			];
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeRead');
 			const result = await graphService.findPatternMatch(
 				patternNodes,
@@ -1256,7 +1260,7 @@ describe('Integration tests for graph service with testcontainers', () => {
 				},
 			];
 
-			const graphService = new Neo4jGraphService(session);
+			const graphService = new Neo4jGraphService(() => session);
 			const neo4jSpy = vi.spyOn(session, 'executeRead');
 			const result = await graphService.findPatternMatch(
 				patternNodes,
@@ -1293,9 +1297,10 @@ describe('Unit tests for graph service with mocked neo4j functions', () => {
 				(callback: (tx: ManagedTransaction) => Promise<never>) =>
 					callback(mockTx)
 			),
+			close: vi.fn().mockResolvedValue(undefined),
 		} as unknown as Session;
 
-		graphService = new Neo4jGraphService(mockSession);
+		graphService = new Neo4jGraphService(() => mockSession);
 		graphService.mapPatternMatchToResult = vi.fn();
 
 		vi.resetAllMocks();

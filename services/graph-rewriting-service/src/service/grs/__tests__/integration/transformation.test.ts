@@ -10,7 +10,7 @@ import {
 } from 'vitest';
 
 import { Neo4jContainer, StartedNeo4jContainer } from '@testcontainers/neo4j';
-import neo4j, { Driver, Session } from 'neo4j-driver';
+import neo4j, { Driver } from 'neo4j-driver';
 import { Neo4jGraphService } from '../../../db/neo4j/graph.service';
 
 import { GraphSchema } from '../../../../types/graph.schema';
@@ -62,7 +62,6 @@ vi.mock('../../../../utils/uuid');
 describe('Integration tests for graph transformation against testcontainers', () => {
 	let container: StartedNeo4jContainer;
 	let driver: Driver;
-	let session: Session;
 	let graphService: Neo4jGraphService;
 
 	beforeAll(async () => {
@@ -75,10 +74,11 @@ describe('Integration tests for graph transformation against testcontainers', ()
 	}, 30000);
 
 	beforeEach(async () => {
-		session = driver.session();
-		graphService = new Neo4jGraphService(session);
+		// The service opens and closes its own sessions via the factory;
+		// no shared session is needed here.
+		graphService = new Neo4jGraphService(() => driver.session());
 
-		vi.resetAllMocks(); // Clear and set back implementation
+		vi.resetAllMocks();
 
 		let nodeCount = 0;
 		let edgeCount = 0;
@@ -98,11 +98,18 @@ describe('Integration tests for graph transformation against testcontainers', ()
 	});
 
 	afterEach(async () => {
-		// Delete all nodes & relationships
-		await session.run(`MATCH (n) CALL (n) { DETACH DELETE n } IN TRANSACTIONS`);
-		// Drop all indexes & constraints
-		await session.run(`CALL apoc.schema.assert({}, {})`);
-		await session.close();
+		// Use a dedicated short-lived session for cleanup.
+		const cleanupSession = driver.session();
+		try {
+			// Delete all nodes & relationships
+			await cleanupSession.run(
+				`MATCH (n) CALL (n) { DETACH DELETE n } IN TRANSACTIONS`
+			);
+			// Drop all indexes & constraints
+			await cleanupSession.run(`CALL apoc.schema.assert({}, {})`);
+		} finally {
+			await cleanupSession.close();
+		}
 
 		vi.clearAllMocks();
 	});

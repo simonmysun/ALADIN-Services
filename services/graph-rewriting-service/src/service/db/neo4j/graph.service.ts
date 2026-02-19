@@ -6,6 +6,8 @@ import {
 	Relationship,
 	QueryResult,
 } from 'neo4j-driver';
+
+export type Neo4jSessionFactory = () => Session;
 import {
 	DBGraphEdgeInternalId,
 	DBGraphNodeInternalId,
@@ -58,7 +60,7 @@ export class Neo4jGraphService implements IGraphDB {
 	private defaultNodeLabel = DEFAULT_NODE_LABEL;
 	private defaultRelationshipLabel = DEFAULT_RELATIONSHIP_LABEL;
 
-	constructor(private readonly session: Session) {}
+	constructor(private readonly sessionFactory: Neo4jSessionFactory) {}
 
 	// TODO: Fix how type is handled
 	public graphType: DBGraphType = 'undirected';
@@ -77,14 +79,20 @@ export class Neo4jGraphService implements IGraphDB {
 
 		const $nodeVar = 'n';
 		const { cypher, params } = createNodeQuery($nodeVar, nodeLabels, metadata);
-		const res = await this.session.executeWrite((tx: ManagedTransaction) =>
-			tx.run<Neo4jCreateNodeResult>(cypher, params)
-		);
 
-		const nodeRecords = res.records.map((record) => record.get($nodeVar));
-		const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeWrite((tx: ManagedTransaction) =>
+				tx.run<Neo4jCreateNodeResult>(cypher, params)
+			);
 
-		return nodes[0];
+			const nodeRecords = res.records.map((record) => record.get($nodeVar));
+			const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
+
+			return nodes[0];
+		} finally {
+			await session.close();
+		}
 	}
 
 	public async updateNode(
@@ -113,14 +121,20 @@ export class Neo4jGraphService implements IGraphDB {
 			metadata,
 			options
 		);
-		const res = await this.session.executeWrite((tx: ManagedTransaction) =>
-			tx.run<Neo4jUpdateNodeResult>(cypher, params)
-		);
 
-		const nodeRecords = res.records.map((record) => record.get(nodeVar));
-		const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeWrite((tx: ManagedTransaction) =>
+				tx.run<Neo4jUpdateNodeResult>(cypher, params)
+			);
 
-		return nodes[0];
+			const nodeRecords = res.records.map((record) => record.get(nodeVar));
+			const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
+
+			return nodes[0];
+		} finally {
+			await session.close();
+		}
 	}
 
 	public async getNode(internalId: DBGraphNodeInternalId) {
@@ -128,14 +142,19 @@ export class Neo4jGraphService implements IGraphDB {
             WHERE n._grs_internalId = $internalId \
             RETURN n`;
 
-		const res = await this.session.executeRead((tx: ManagedTransaction) =>
-			tx.run(cypher, { internalId })
-		);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeRead((tx: ManagedTransaction) =>
+				tx.run(cypher, { internalId })
+			);
 
-		const nodeRecords = res.records.map((record) => record.get('n'));
-		const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
+			const nodeRecords = res.records.map((record) => record.get('n'));
+			const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
 
-		return nodes[0];
+			return nodes[0];
+		} finally {
+			await session.close();
+		}
 	}
 
 	public async getAllNodes() {
@@ -145,14 +164,19 @@ export class Neo4jGraphService implements IGraphDB {
 		const cypher = `MATCH (n)
 		    RETURN DISTINCT n`;
 
-		const res = await this.session.executeRead((tx: ManagedTransaction) =>
-			tx.run<Neo4jGetNodesResult>(cypher)
-		);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeRead((tx: ManagedTransaction) =>
+				tx.run<Neo4jGetNodesResult>(cypher)
+			);
 
-		const nodeRecords = res.records.map((record) => record.get('n'));
-		const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
+			const nodeRecords = res.records.map((record) => record.get('n'));
+			const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
 
-		return nodes;
+			return nodes;
+		} finally {
+			await session.close();
+		}
 	}
 
 	public async deleteNode(internalId: DBGraphNodeInternalId) {
@@ -160,13 +184,18 @@ export class Neo4jGraphService implements IGraphDB {
             WHERE n._grs_internalId = $internalId \
             DETACH DELETE n`;
 
-		const res = await this.session.executeWrite((tx: ManagedTransaction) =>
-			tx.run(cypher, { internalId })
-		);
-		const nodeRecords = res.records.map((record) => record.get('n'));
-		const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeWrite((tx: ManagedTransaction) =>
+				tx.run(cypher, { internalId })
+			);
+			const nodeRecords = res.records.map((record) => record.get('n'));
+			const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
 
-		return nodes[0];
+			return nodes[0];
+		} finally {
+			await session.close();
+		}
 	}
 
 	public async deleteNodes(internalIds: DBGraphNodeInternalId[]) {
@@ -174,13 +203,18 @@ export class Neo4jGraphService implements IGraphDB {
             WHERE n._grs_internalId in $internalIds \
             DETACH DELETE n`;
 
-		const res = await this.session.executeWrite((tx: ManagedTransaction) =>
-			tx.run(cypher, { internalIds })
-		);
-		const nodeRecords = res.records.map((record) => record.get('n'));
-		const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeWrite((tx: ManagedTransaction) =>
+				tx.run(cypher, { internalIds })
+			);
+			const nodeRecords = res.records.map((record) => record.get('n'));
+			const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
 
-		return nodes;
+			return nodes;
+		} finally {
+			await session.close();
+		}
 	}
 
 	public async deleteAllNodes() {
@@ -189,12 +223,17 @@ export class Neo4jGraphService implements IGraphDB {
             { DETACH DELETE n } \
             IN TRANSACTIONS';
 
-		const res = await this.session.run(cypher);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.run(cypher);
 
-		const nodeRecords = res.records.map((record) => record.get('n'));
-		const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
+			const nodeRecords = res.records.map((record) => record.get('n'));
+			const nodes = this.mapNodeRecordsToNodesResult(nodeRecords);
 
-		return nodes || [];
+			return nodes || [];
+		} finally {
+			await session.close();
+		}
 	}
 
 	// TODO: check which what kind of content can be saved in neo4j properties and type metadata accordingly
@@ -225,18 +264,23 @@ export class Neo4jGraphService implements IGraphDB {
 			AND b._grs_internalId = $internalIdTarget \
 			CREATE (a)-[r:${relation} $attributes ]->(b) RETURN r`;
 
-		const res = await this.session.executeWrite((tx: ManagedTransaction) =>
-			tx.run<Neo4jRelationshipResult>(cypher, {
-				internalIdSource,
-				internalIdTarget,
-				attributes,
-			})
-		);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeWrite((tx: ManagedTransaction) =>
+				tx.run<Neo4jRelationshipResult>(cypher, {
+					internalIdSource,
+					internalIdTarget,
+					attributes,
+				})
+			);
 
-		const edgeRecords = res.records.map((record) => record.get('r'));
-		const edges = this.mapEdgeRecordsToEdgesResult(edgeRecords);
+			const edgeRecords = res.records.map((record) => record.get('r'));
+			const edges = this.mapEdgeRecordsToEdgesResult(edgeRecords);
 
-		return edges[0];
+			return edges[0];
+		} finally {
+			await session.close();
+		}
 	}
 
 	public async updateEdge(
@@ -293,14 +337,19 @@ export class Neo4jGraphService implements IGraphDB {
             WHERE r._grs_internalId = $internalId \
             RETURN r`;
 
-		const res = await this.session.executeRead((tx: ManagedTransaction) =>
-			tx.run(cypher, { internalId })
-		);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeRead((tx: ManagedTransaction) =>
+				tx.run(cypher, { internalId })
+			);
 
-		const edgeRecords = res.records.map((record) => record.get('r'));
-		const edges = this.mapEdgeRecordsToEdgesResult(edgeRecords);
+			const edgeRecords = res.records.map((record) => record.get('r'));
+			const edges = this.mapEdgeRecordsToEdgesResult(edgeRecords);
 
-		return edges[0];
+			return edges[0];
+		} finally {
+			await session.close();
+		}
 	}
 
 	public async deleteEdge(internalId: DBGraphEdgeInternalId) {
@@ -308,15 +357,20 @@ export class Neo4jGraphService implements IGraphDB {
 			WHERE r._grs_internalId = $internalId \
 			DELETE r`;
 
-		const res = await this.session.executeWrite((tx: ManagedTransaction) =>
-			tx.run<Neo4jRelationshipResult>(cypher, {
-				internalId,
-			})
-		);
-		const edgeRecords = res.records.map((record) => record.get('r'));
-		const edges = this.mapEdgeRecordsToEdgesResult(edgeRecords);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeWrite((tx: ManagedTransaction) =>
+				tx.run<Neo4jRelationshipResult>(cypher, {
+					internalId,
+				})
+			);
+			const edgeRecords = res.records.map((record) => record.get('r'));
+			const edges = this.mapEdgeRecordsToEdgesResult(edgeRecords);
 
-		return edges[0];
+			return edges[0];
+		} finally {
+			await session.close();
+		}
 	}
 
 	public async deleteEdges(internalIds: DBGraphEdgeInternalId[]) {
@@ -324,29 +378,39 @@ export class Neo4jGraphService implements IGraphDB {
 			WHERE r._grs_internalId in $internalIds \
 			DELETE r`;
 
-		const res = await this.session.executeWrite((tx: ManagedTransaction) =>
-			tx.run<Neo4jRelationshipResult>(cypher, {
-				internalIds,
-			})
-		);
-		const edgeRecords = res.records.map((record) => record.get('r'));
-		const edges = this.mapEdgeRecordsToEdgesResult(edgeRecords);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeWrite((tx: ManagedTransaction) =>
+				tx.run<Neo4jRelationshipResult>(cypher, {
+					internalIds,
+				})
+			);
+			const edgeRecords = res.records.map((record) => record.get('r'));
+			const edges = this.mapEdgeRecordsToEdgesResult(edgeRecords);
 
-		return edges;
+			return edges;
+		} finally {
+			await session.close();
+		}
 	}
 
 	public async getAllEdges() {
 		const cypher = `MATCH ()-[r]-() \
 			RETURN DISTINCT r`;
 
-		const res = await this.session.executeRead((tx: ManagedTransaction) =>
-			tx.run<Neo4jRelationshipResult>(cypher)
-		);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeRead((tx: ManagedTransaction) =>
+				tx.run<Neo4jRelationshipResult>(cypher)
+			);
 
-		const edgeRecords = res.records.map((record) => record.get('r'));
-		const edges = this.mapEdgeRecordsToEdgesResult(edgeRecords);
+			const edgeRecords = res.records.map((record) => record.get('r'));
+			const edges = this.mapEdgeRecordsToEdgesResult(edgeRecords);
 
-		return edges;
+			return edges;
+		} finally {
+			await session.close();
+		}
 	}
 
 	/**
@@ -458,13 +522,18 @@ export class Neo4jGraphService implements IGraphDB {
 		// Else build cypher and query database
 		const cypher = `MATCH ${query} RETURN ${queryVars.join(', ')}`;
 
-		const res = await this.session.executeRead((tx: ManagedTransaction) =>
-			tx.run<Neo4jPatternMatchResult>(cypher, parameters)
-		);
+		const session = this.sessionFactory();
+		try {
+			const res = await session.executeRead((tx: ManagedTransaction) =>
+				tx.run<Neo4jPatternMatchResult>(cypher, parameters)
+			);
 
-		const result = this.mapPatternMatchToResult(res, queryVars);
+			const result = this.mapPatternMatchToResult(res, queryVars);
 
-		return result;
+			return result;
+		} finally {
+			await session.close();
+		}
 	}
 
 	public mapPatternMatchToResult(
@@ -556,23 +625,28 @@ export class Neo4jGraphService implements IGraphDB {
 			// grs_edge_key: `CREATE CONSTRAINT grs_edge_key FOR ()-[r:${this.defaultRelationshipLabel}]-() REQUIRE r._grs_internalId IS RELATIONSHIP KEY`,
 		};
 
-		// get all constraints
-		const res = await this.session.executeRead((tx: ManagedTransaction) =>
-			tx.run(`SHOW CONSTRAINTS`)
-		);
+		const session = this.sessionFactory();
+		try {
+			// get all constraints
+			const res = await session.executeRead((tx: ManagedTransaction) =>
+				tx.run(`SHOW CONSTRAINTS`)
+			);
 
-		const constraintNames = res.records.map((record) => record.get('name'));
+			const constraintNames = res.records.map((record) => record.get('name'));
 
-		// check if the necessary constraints exists
-		// and create them if they don't exist
-		for (const [constraintKey, constraintCypher] of Object.entries(
-			constraints
-		)) {
-			if (!constraintNames.includes(constraintKey)) {
-				await this.session.executeWrite((tx: ManagedTransaction) =>
-					tx.run(constraintCypher)
-				);
+			// check if the necessary constraints exists
+			// and create them if they don't exist
+			for (const [constraintKey, constraintCypher] of Object.entries(
+				constraints
+			)) {
+				if (!constraintNames.includes(constraintKey)) {
+					await session.executeWrite((tx: ManagedTransaction) =>
+						tx.run(constraintCypher)
+					);
+				}
 			}
+		} finally {
+			await session.close();
 		}
 	}
 

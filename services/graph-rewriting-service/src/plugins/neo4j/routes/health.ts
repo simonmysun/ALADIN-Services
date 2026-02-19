@@ -5,13 +5,13 @@ const healthcheck = async (
 	request: FastifyRequest,
 	reply: FastifyReply
 ): Promise<FastifyReply> => {
-	const session = request.neo4j;
+	const driver = request.server.neo4j;
 
-	if (session) {
+	if (driver) {
 		return okReply(reply, {});
 	}
 
-	throw Error('Neo4j session not found');
+	throw Error('Neo4j driver not found');
 };
 
 export default async function routes(fastify: FastifyInstance) {
