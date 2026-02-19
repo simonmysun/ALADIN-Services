@@ -1,0 +1,166 @@
+<html>
+	<body>
+		<div>
+			<p>
+				Select a "grammar":
+				<select name="grammars" id="grammars">
+					<option value="EPC">EPC</option>
+					<option value="Sierpinsky">Sierpinsky</option>
+					<option value="umlActivityToPetrinet">
+						UML-Activity to Petrinet
+					</option>
+				</select>
+			</p>
+			<button id="execute">Execute</button>
+			<button id="forward">Forward</button>
+			<button id="backward">Backward</button>
+		</div>
+		<div id="graph" style="width: 95vw; height: 90vh; overflow: hidden"></div>
+	</body>
+
+	<script src="//d3js.org/d3.v7.min.js"></script>
+	<script src="https://unpkg.com/@hpcc-js/wasm@2.20.0/dist/graphviz.umd.js"></script>
+	<script src="https://unpkg.com/d3-graphviz@5.6.0/build/d3-graphviz.js"></script>
+
+	<script type="module">
+		// prettier-ignore
+		const EPC = {"hostgraph":{"options":{"type":"directed"},"nodes":[{"key":"Start","attributes":{"label":"Start","type":"Event"}},{"key":"Ende","attributes":{"label":"Ende","type":"Event"}}],"edges":[{"key":"StartToEnde","source":"Start","target":"Ende","attributes":{}}]},"rules":[{"key":"add_pattern","options":{"homomorphic":false},"patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{}},{"key":"B","attributes":{}}],"edges":[{"key":"aToB","source":"A","target":"B","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{}},{"key":"Pattern","attributes":{"label":{"type":"randexp","args":{"pattern":"(AND-Rhombus|OR-Rhombus|XOR-Rhombus)","options":{}}},"type":"pattern"}},{"key":"B","attributes":{}}],"edges":[{"key":"AToPattern","source":"A","target":"Pattern","attributes":{}},{"key":"PatternToB","source":"Pattern","target":"B","attributes":{}}]}},{"key":"replace_pattern_with_gate_sequence","options":{"homomorphic":false},"patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{}},{"key":"Pattern","attributes":{"type":"pattern"}},{"key":"B","attributes":{}}],"edges":[{"key":"AToPattern","source":"A","target":"Pattern","attributes":{}},{"key":"PatternToB","source":"Pattern","target":"B","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{}},{"key":"Sequence1","attributes":{"type":"Sequence"}},{"key":"Gate1","attributes":{"type":"Gate","label":{"type":"jsonLogic","args":{"rule":{"if":[{"==":["$.nodes.[?(@.key === 'Pattern')].attributes.label","AND-Rhombus"]},"AND",{"==":["$.nodes.[?(@.key === 'Pattern')].attributes.label","OR-Rhombus"]},"OR",{"==":["$.nodes.[?(@.key === 'Pattern')].attributes.label","XOR-Rhombus"]},"XOR",{"var":""}]}}}}},{"key":"Sequence2","attributes":{"type":"Sequence"}},{"key":"Gate2","attributes":{"type":"Gate","label":{"type":"jsonLogic","args":{"rule":{"if":[{"==":["$.nodes.[?(@.key === 'Pattern')].attributes.label","AND-Rhombus"]},"AND",{"==":["$.nodes.[?(@.key === 'Pattern')].attributes.label","OR-Rhombus"]},"OR",{"==":["$.nodes.[?(@.key === 'Pattern')].attributes.label","XOR-Rhombus"]},"XOR",{"var":""}]}}}}},{"key":"Sequence3","attributes":{"type":"Sequence"}},{"key":"B","attributes":{}}],"edges":[{"key":"AToSequence1","source":"A","target":"Sequence1","attributes":{}},{"key":"Sequence1toGate1","source":"Sequence1","target":"Gate1","attributes":{}},{"key":"Gate1ToSequence2","source":"Gate1","target":"Sequence2","attributes":{}},{"key":"Sequence2ToGate2","source":"Sequence2","target":"Gate2","attributes":{}},{"key":"Gate2ToSequence3","source":"Gate2","target":"Sequence3","attributes":{}},{"key":"Sequence3ToB","source":"Sequence3","target":"B","attributes":{}}]}},{"key":"add_branches_to_gates","options":{"homomorphic":false},"patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"GateA","attributes":{"type":"Gate"}},{"key":"Sequence","attributes":{"type":"Sequence"}},{"key":"GateB","attributes":{"type":"Gate"}}],"edges":[{"key":"GateAToSequence","source":"GateA","target":"Sequence","attributes":{}},{"key":"SequenceToGateB","source":"Sequence","target":"GateB","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"GateA","attributes":{"type":"Gate"}},{"key":"Sequence","attributes":{"type":"Sequence"}},{"key":"GateB","attributes":{"type":"Gate"}},{"key":"Sequence2","attributes":{"type":"Sequence"}}],"edges":[{"key":"GateAToSequence","source":"GateA","target":"Sequence","attributes":{}},{"key":"SequenceToGateB","source":"Sequence","target":"GateB","attributes":{}},{"key":"GateAToSequence2","source":"GateA","target":"Sequence2","attributes":{}},{"key":"Sequence2ToGateB","source":"Sequence2","target":"GateB","attributes":{}}]}},{"key":"replace_middle_sequences","options":{"homomorphic":false},"patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"GateA","attributes":{"type":"Gate"}},{"key":"Sequence","attributes":{"type":"Sequence"}},{"key":"GateB","attributes":{"type":"Gate"}}],"edges":[{"key":"GateAToSequence","source":"GateA","target":"Sequence","attributes":{}},{"key":"SequenceToGateB","source":"Sequence","target":"GateB","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"GateA","attributes":{"type":"Gate"}},{"key":"Sequence","attributes":{"type":"Event"}},{"key":"GateB","attributes":{"type":"Gate"}}],"edges":[{"key":"GateAToSequence","source":"GateA","target":"Sequence","attributes":{}},{"key":"SequenceToGateB","source":"Sequence","target":"GateB","attributes":{}}]}},{"key":"expand_event","options":{"homomorphic":false},"patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"Event","attributes":{"type":"Event"}},{"key":"B","attributes":{}}],"edges":[{"key":"eventToB","source":"Event","target":"B","attributes":{}}],"nacs":[{"nodes":[{"key":"Event","attributes":{"label":"Start"}}],"edges":[]}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"Event","attributes":{"type":"Event"}},{"key":"Function","attributes":{"type":"Function"}},{"key":"Event2","attributes":{"type":"Event"}},{"key":"B","attributes":{}}],"edges":[{"key":"EventToFunction","source":"Event","target":"Function","attributes":{}},{"key":"FunctionToEvent2","source":"Function","target":"Event2","attributes":{}},{"key":"Event2","source":"Event2","target":"B","attributes":{}}]}},{"key":"replace_outer_sequences","options":{"homomorphic":false},"patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"Before","attributes":{"type":["Event","Gate"]}},{"key":"Function","attributes":{"type":"Sequence"}},{"key":"After","attributes":{"type":["Event","Gate"]}}],"edges":[{"key":"BeforeToFunction","source":"Before","target":"Function","attributes":{}},{"key":"FunctionToAfter","source":"Function","target":"After","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"Before"},{"key":"Function","attributes":{"type":"Function","label":{"type":"faker","args":{"module":"company","method":"buzzVerb"}}}},{"key":"After"}],"edges":[{"key":"BeforeToFunction","source":"Before","target":"Function","attributes":{}},{"key":"FunctionToAfter","source":"Function","target":"After","attributes":{}}]}},{"key":"expand_function","options":{"homomorphic":false},"patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"Function","attributes":{"type":"Function"}},{"key":"B","attributes":{}}],"edges":[{"key":"FunctionToB","source":"Function","target":"B","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"Function","attributes":{"type":"Function"}},{"key":"Event","attributes":{"type":"Event"}},{"key":"Function2","attributes":{"type":"Function","label":{"type":"faker","args":{"module":"word","method":"verb"}}}},{"key":"B","attributes":{}}],"edges":[{"key":"FunctionToEvent","source":"Function","target":"Event","attributes":{}},{"key":"EventToFunction2","source":"Event","target":"Function2","attributes":{}},{"key":"Function2","source":"Function2","target":"B","attributes":{}}]}}],"sequence":[{"rule":"add_pattern","options":{"mode":"all"}},{"rule":"replace_pattern_with_gate_sequence","options":{"mode":"all"}},{"rule":"add_branches_to_gates","options":{"mode":"all"}},{"rule":"add_branches_to_gates","options":{"mode":"interval","interval":{"min":1,"max":1},"repeat":[0,4]}},{"rule":"replace_middle_sequences","options":{"mode":"all"}},{"rule":"replace_outer_sequences","options":{"mode":"all"}},{"rule":"expand_event","options":{"mode":"interval","interval":{"min":0,"max":1},"repeat":1}},{"rule":"expand_function","options":{"mode":"interval","interval":{"min":0,"max":1},"repeat":1}}],"options":{"returnHistory":true}};
+		// prettier-ignore
+		const Sierpinsky = {"hostgraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"added":"yes"}},{"key":"B","attributes":{"added":"yes"}},{"key":"C","attributes":{"added":"no"}}],"edges":[{"key":"aToB","source":"A","target":"B","attributes":{}},{"key":"bToC","source":"B","target":"C","attributes":{}},{"key":"cToA","source":"C","target":"A","attributes":{}}]},"rules":[{"key":"initialize","homomorphic":false,"patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{}},{"key":"B","attributes":{}},{"key":"C","attributes":{}}],"edges":[{"key":"aToB","source":"A","target":"B","attributes":{}},{"key":"bToC","source":"B","target":"C","attributes":{}},{"key":"cToA","source":"C","target":"A","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"added":"yes"}},{"key":"B","attributes":{"added":"yes"}},{"key":"C","attributes":{"added":"no"}}],"edges":[{"key":"aToB","source":"A","target":"B","attributes":{}},{"key":"bToC","source":"B","target":"C","attributes":{}},{"key":"cToA","source":"C","target":"A","attributes":{}}]}},{"key":"add_generation","homomorphic":false,"patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"added":"yes"}},{"key":"B","attributes":{"added":"yes"}},{"key":"C","attributes":{"added":"no"}}],"edges":[{"key":"aToB","source":"A","target":"B","attributes":{}},{"key":"bToC","source":"B","target":"C","attributes":{}},{"key":"cToA","source":"C","target":"A","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"added":"no"}},{"key":"AB","attributes":{"added":"yes"}},{"key":"B","attributes":{"added":"no"}},{"key":"BC","attributes":{"added":"yes"}},{"key":"C","attributes":{"added":"no"}},{"key":"CA","attributes":{"added":"yes"}}],"edges":[{"key":"AtoAB","source":"A","target":"AB","attributes":{}},{"key":"ABtoB","source":"AB","target":"B","attributes":{}},{"key":"BtoBC","source":"B","target":"BC","attributes":{}},{"key":"BCtoC","source":"BC","target":"C","attributes":{}},{"key":"CtoCA","source":"C","target":"CA","attributes":{}},{"key":"CAtoA","source":"CA","target":"A","attributes":{}},{"key":"ABtoCA","source":"AB","target":"CA","attributes":{}},{"key":"CAtoBC","source":"CA","target":"BC","attributes":{}},{"key":"BCtoAB","source":"BC","target":"AB","attributes":{}}]}}],"sequence":[{"rule":"initialize","options":{"mode":"all"}},{"rule":"add_generation","options":{"mode":"all","repeat":3}}],"options":{"returnHistory":true}};
+		// prettier-ignore
+		const umlActivityToPetrinet = {"hostgraph":{"options":{"type":"directed"},"nodes":[{"key":"Start","attributes":{"type":"Initial"}},{"key":"ReceiveOrder","attributes":{"type":"Action","label":"Receive Order"}},{"key":"Decision1","attributes":{"type":"Decision"}},{"key":"PrepareOrder","attributes":{"type":"Action","label":"Prepare Order"}},{"key":"Fork1","attributes":{"type":"Fork"}},{"key":"ShipOrder","attributes":{"type":"Action","label":"Ship Order"}},{"key":"SendInvoice","attributes":{"type":"Action","label":"Send Invoice"}},{"key":"AwaitPayment","attributes":{"type":"Action","label":"Await Payment"}},{"key":"ProcessPayment","attributes":{"type":"Action","label":"Process Payment"}},{"key":"Join1","attributes":{"type":"Join"}},{"key":"Merge1","attributes":{"type":"Merge"}},{"key":"CloseOrder","attributes":{"type":"Action","label":"Close Order"}},{"key":"Final","attributes":{"type":"ActivityFinal","label":"Final"}}],"edges":[{"key":"StartToReceiveOrder","source":"Start","target":"ReceiveOrder","attributes":{}},{"key":"ReceiveOrderToDecision1","source":"ReceiveOrder","target":"Decision1","attributes":{}},{"key":"Decision1ToMerge1","source":"Decision1","target":"Merge1","attributes":{"label":"Reject Order"}},{"key":"Decision1ToPrepareOrder","source":"Decision1","target":"PrepareOrder","attributes":{"label":"Accept Order"}},{"key":"PrepareOrderToFork1","source":"PrepareOrder","target":"Fork1","attributes":{}},{"key":"Fork1ToShipOrder","source":"Fork1","target":"ShipOrder","attributes":{}},{"key":"ShipOrderToJoin1","source":"ShipOrder","target":"Join1","attributes":{}},{"key":"Fork1ToSendInvoice","source":"Fork1","target":"SendInvoice","attributes":{}},{"key":"SendInvoiceToAwaitPayment","source":"SendInvoice","target":"AwaitPayment","attributes":{}},{"key":"AwaitPaymentToProcessPayment","source":"AwaitPayment","target":"ProcessPayment","attributes":{}},{"key":"ProcessPaymentToJoin1","source":"ProcessPayment","target":"Join1","attributes":{}},{"key":"Join1ToMerge1","source":"Join1","target":"Merge1","attributes":{}},{"key":"Merge1ToCloseOrder","source":"Merge1","target":"CloseOrder","attributes":{}},{"key":"CloseOrderToFinal","source":"CloseOrder","target":"Final","attributes":{}}]},"rules":[{"key":"replace_controlnode_to_controlnode_edges","patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":["Initial","Decision","Merge"]}},{"key":"B","attributes":{"type":["Decision","Merge","FlowFinal","ActivityFinal"]}}],"edges":[{"key":"aToB","source":"A","target":"B","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{}},{"key":"B","attributes":{}},{"key":"C","attributes":{"type":"Transition"}}],"edges":[{"key":"aToC","source":"A","target":"C","attributes":{"label":{"type":"jsonLogic","args":{"rule":{"var":"a"},"data":{"a":"$.edges.[?(@.key === 'aToB')].attributes.label"}}}}},{"key":"CtoB","source":"C","target":"B","attributes":{}}]}},{"key":"replace_standard_activity_edges","patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":"Action"}},{"key":"B","attributes":{"type":"Action"}}],"edges":[{"key":"aToB","source":"A","target":"B","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":"Action"}},{"key":"B","attributes":{"type":"Action"}},{"key":"C","attributes":{"type":"Place"}}],"edges":[{"key":"aToC","source":"A","target":"C","attributes":{}},{"key":"CtoB","source":"C","target":"B","attributes":{}}]}},{"key":"replace_fork_join_to_action_edges","patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":["Fork","Join"]}},{"key":"B","attributes":{"type":"Action"}}],"edges":[{"key":"aToB","source":"A","target":"B","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":"Fork"}},{"key":"B","attributes":{"type":"Action"}},{"key":"C","attributes":{"type":"Place"}}],"edges":[{"key":"aToC","source":"A","target":"C","attributes":{}},{"key":"CtoB","source":"C","target":"B","attributes":{}}]}},{"key":"replace_action_to_fork_join_edges","patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":"Action"}},{"key":"B","attributes":{"type":["Join","Fork"]}}],"edges":[{"key":"aToB","source":"A","target":"B","attributes":{}}]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":"Action"}},{"key":"B","attributes":{}},{"key":"C","attributes":{"type":"Place"}}],"edges":[{"key":"aToC","source":"A","target":"C","attributes":{}},{"key":"CtoB","source":"C","target":"B","attributes":{}}]}},{"key":"replace_control_nodes_with_places","patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":["Initial","Decision","Merge","FlowFinal","ActivityFinal"]}}],"edges":[]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":"Place","label":{"type":"jsonLogic","args":{"rule":{"if":[{"==":["$.nodes.[?(@.key === 'A')].attributes.type","Initial"]},"Start",{"==":["$.nodes.[?(@.key === 'A')].attributes.type","ActivityFinal"]},"Final"]}}}}}],"edges":[]}},{"key":"replace_action_nodes_with_transitions","patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":["Action"]}}],"edges":[]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":"Transition"}}],"edges":[]}},{"key":"replace_fork_nodes_with_transitions","patternGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":["Fork","Join"]}}],"edges":[]},"replacementGraph":{"options":{"type":"directed"},"nodes":[{"key":"A","attributes":{"type":"Transition","label":{"type":"jsonLogic","args":{"rule":{"if":[{"==":["$.nodes.[?(@.key === 'A')].attributes.type","Fork"]},"Fork",{"==":["$.nodes.[?(@.key === 'A')].attributes.type","Join"]},"Join"]}}}}}],"edges":[]}}],"sequence":[{"rule":"replace_controlnode_to_controlnode_edges","options":{"mode":"all"}},{"rule":"replace_fork_join_to_action_edges","options":{"mode":"all"}},{"rule":"replace_action_to_fork_join_edges","options":{"mode":"all"}},{"rule":"replace_standard_activity_edges","options":{"mode":"all"}},{"rule":"replace_control_nodes_with_places","options":{"mode":"all"}},{"rule":"replace_action_nodes_with_transitions","options":{"mode":"all"}},{"rule":"replace_fork_nodes_with_transitions","options":{"mode":"all"}}],"options":{"returnHistory":true}};
+
+		const grammars = {
+			EPC,
+			Sierpinsky,
+			umlActivityToPetrinet,
+		};
+
+		let chosenGrammar = 'EPC';
+
+		document
+			.querySelector('#grammars')
+			.addEventListener('change', async (event) => {
+				chosenGrammar = event.target.value;
+				handleExecution();
+			});
+
+		const dotAttributes = {
+			// EPC Styles
+			Event: `shape="hexagon", color="indianred1", style="filled"`,
+			Function: `shape="rectangle", nodeStyle="rounded", color="green", style="filled"`,
+			Gate: `shape="circle", color="grey", style="filled"`,
+			pattern: `shape="diamond", color="lightblue", style="filled"`,
+			Sequence: `shape="diamond", color="lightblue", style="filled"`,
+			// UML-Activity Styles
+			Initial: `shape="circle", color="black", style="filled"`,
+			Action: `shape="rectangle", nodeStyle="rounded", color="lightblue", style="filled"`,
+			Decision: `shape="diamond", color="grey", style="filled"`,
+			Fork: `shape="rectangle", color="black", style="filled", fixedsize="true", height="0.08", label=""`,
+			Join: `shape="rectangle", color="black", style="filled", fixedsize="true", height="0.08", label=""`,
+			Merge: `shape="diamond", color="grey", style="filled"`,
+			ActivityFinal: `shape="doublecircle", color="black", style="filled"`,
+			// Petrinet Styles
+			Transition: `shape="rectangle", color="black", style="filled", label="", fixedsize="true", height="0.08"`,
+			Place: `shape="circle", color="black", label="",`,
+			// Default Node Style (e.g. Sierpinsky)
+			default: `shape="circle", color="lightgrey", style="filled"`,
+		};
+
+		const graphologyArrayToDotArray = (graphologyArray) => {
+			return graphologyArray.map((graph) => {
+				const nodeString = transformNodes(graph.nodes);
+				const edgeString = transformEdges(graph.edges);
+				const dotString = `digraph diagram {\n ${nodeString}\n ${edgeString}\n}`;
+				return dotString;
+			});
+		};
+
+		const transformNodes = (nodes) => {
+			return nodes
+				.map((node, i) => {
+					const { key, attributes } = node;
+					const { label, type } = attributes;
+
+					const nodeAttributesString = type
+						? `[ label="${label ?? type}", type="${type}" ${dotAttributes[type]}]`
+						: `[ label="${i}", ${dotAttributes['default']} ]`;
+
+					return `${key} ${nodeAttributesString}`;
+				})
+				.join('\n');
+		};
+
+		const transformEdges = (edges) => {
+			return edges
+				.map((edge) => {
+					const { source, target } = edge;
+					return `${source} -> ${target}`;
+				})
+				.join('\n');
+		};
+
+		let graphs;
+
+		let dotGraphs;
+
+		const handleExecution = async () => {
+			const response = await window.fetch('http://127.0.0.1:8080/transform', {
+				method: 'POST',
+				body: JSON.stringify(grammars[chosenGrammar]),
+				headers: {
+					'Content-Type': 'application/json',
+				},
+			});
+			graphs = await response.json();
+			dotGraphs = graphologyArrayToDotArray(graphs.data);
+			i = 0;
+
+			draw();
+		};
+
+		document
+			.querySelector('#execute')
+			.addEventListener('click', handleExecution);
+
+		let i = 0;
+		const renderer = window.d3.select('#graph').graphviz();
+		const draw = () => {
+			const dot = dotGraphs[i];
+			console.log(dot);
+			if (dot)
+				renderer.renderDot(dot).transition(function () {
+					return window.d3.transition().duration(150);
+				});
+		};
+
+		document.querySelector('#forward').addEventListener('click', () => {
+			if (i < dotGraphs.length) i++;
+			draw();
+		});
+		document.querySelector('#backward').addEventListener('click', () => {
+			if (i > 0) i--;
+			draw();
+		});
+
+		handleExecution();
+	</script>
+
+	<style>
+		#graph > svg {
+			display: flex;
+			justify-items: center;
+			align-content: center;
+			width: 100%;
+			height: 100%;
+		}
+
+		.graph {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			width: 100%;
+			height: 100%;
+		}
+	</style>
+</html>

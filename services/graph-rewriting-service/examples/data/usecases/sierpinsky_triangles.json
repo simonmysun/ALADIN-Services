@@ -297,5 +297,7 @@
 			}
 		}
 	],
-	"returnHistory": true
+	"options": {
+		"returnHistory": true
+	}
 }

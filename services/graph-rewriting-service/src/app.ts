@@ -1,6 +1,8 @@
 import 'dotenv/config';
 
 import fastify, { FastifyInstance } from 'fastify';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
 import { Server, IncomingMessage, ServerResponse } from 'http';
 
 import Swagger from '@fastify/swagger';
@@ -32,6 +34,9 @@ export function buildServer(): FastifyInstance {
 		});
 
 	logger.init(server.log);
+
+	// Setup static file serving
+	server.register(fastifyStatic, { root: path.join(__dirname, '/static') });
 
 	// Setup CORS
 	server.register(cors, CorsOptions);

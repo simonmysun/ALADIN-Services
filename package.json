@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "json-logic-engine": "^5.0.6"
+  }
+}

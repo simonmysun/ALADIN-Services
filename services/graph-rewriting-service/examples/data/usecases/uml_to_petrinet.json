@@ -193,13 +193,22 @@
 					{
 						"key": "A",
 						"attributes": {
-							"type": ["Initial", "Decision", "Merge"]
+							"type": [
+								"Initial",
+								"Decision",
+								"Merge"
+							]
 						}
 					},
 					{
 						"key": "B",
 						"attributes": {
-							"type": ["Decision", "Merge", "FlowFinal", "ActivityFinal"]
+							"type": [
+								"Decision",
+								"Merge",
+								"FlowFinal",
+								"ActivityFinal"
+							]
 						}
 					}
 				],
@@ -339,7 +348,10 @@
 					{
 						"key": "A",
 						"attributes": {
-							"type": ["Fork", "Join"]
+							"type": [
+								"Fork",
+								"Join"
+							]
 						}
 					},
 					{
@@ -414,7 +426,10 @@
 					{
 						"key": "B",
 						"attributes": {
-							"type": ["Join", "Fork"]
+							"type": [
+								"Join",
+								"Fork"
+							]
 						}
 					}
 				],
@@ -535,7 +550,9 @@
 					{
 						"key": "A",
 						"attributes": {
-							"type": ["Action"]
+							"type": [
+								"Action"
+							]
 						}
 					}
 				],
@@ -566,7 +583,10 @@
 					{
 						"key": "A",
 						"attributes": {
-							"type": ["Fork", "Join"]
+							"type": [
+								"Fork",
+								"Join"
+							]
 						}
 					}
 				],
@@ -655,5 +675,7 @@
 			}
 		}
 	],
-	"returnHistory": true
+	"options": {
+		"returnHistory": true
+	}
 }

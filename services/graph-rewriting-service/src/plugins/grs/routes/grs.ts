@@ -34,5 +34,9 @@ export default async function routes(fastify: FastifyInstance) {
 		transformHandler
 	);
 
+	fastify.get('/visualizer', async (request, response) => {
+		return response.sendFile('./graphology_visualizer.html');
+	});
+
 	fastify.post('/example-external-api-result', externalApiExampleHandler);
 }
