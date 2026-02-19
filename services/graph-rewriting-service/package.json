@@ -46,6 +46,7 @@
 		"fastify-plugin": "^5.0.1",
 		"graphology": "^0.26.0",
 		"graphology-types": "^0.24.8",
+		"json-logic-engine": "^5.0.6",
 		"json-logic-js": "^2.0.5",
 		"jsonpath-plus": "^10.3.0",
 		"neo4j-driver": "^5.27.0",
