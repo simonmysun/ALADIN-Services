@@ -1,4 +1,3 @@
-import { LogicEngine } from 'json-logic-engine';
 import { JSONPath } from 'jsonpath-plus';
 import type { AdditionalOperation, RulesLogic } from 'json-logic-js';
 
@@ -26,12 +25,17 @@ export enum JsonPathErrors {
 	'PathUnresolvable' = 'JSON Path could not be resolved',
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let logicEngine: any;
+(async () => {
+	const { LogicEngine } = await import('json-logic-engine');
+	logicEngine = new LogicEngine();
+})();
+
 export class JsonLogicInstantiator
 	implements IValueInstantiator<JsonLogicInstantiatorOptions>
 {
 	readonly _instantiatorKey = 'jsonLogic';
-
-	private logicEngine = new LogicEngine();
 
 	get instantiatorKey() {
 		return this._instantiatorKey;
@@ -77,7 +81,8 @@ export class JsonLogicInstantiator
 		try {
 			// since JsonLogic results can be different data types (e.g. arrays)
 			// we need to turn these into strings if not primary data type
-			const result = this.logicEngine.run(rule, data);
+
+			const result = logicEngine.run(rule, data);
 			if (['string', 'boolean', 'number'].includes(typeof result)) {
 				logger.info(
 					{ result },
