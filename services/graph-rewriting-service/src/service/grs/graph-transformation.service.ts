@@ -30,6 +30,7 @@ import { SpoRewriteService } from './spo-rewrite.service';
 import { logger } from '../../utils/logger';
 import { HistoryService } from './history.service';
 import { GraphFindRuleSchema } from '../../types/find-rule.schema';
+import { RewritingNestedRuleProcessingConfigSchema } from '../../types/run-nested-config.schema';
 
 export type ResultGraphSchema = Omit<GraphSchema, 'nodes' | 'edges'> & {
 	nodes: (Omit<GraphNodeSchema, 'attributes'> & {
@@ -56,10 +57,46 @@ export class GraphTransformationService {
 		this.historyService = new HistoryService();
 	}
 
+	private isRewritingRuleProcessingConfigSchema(
+		config:
+			| RewritingRuleProcessingConfigSchema
+			| RewritingNestedRuleProcessingConfigSchema
+	): config is RewritingRuleProcessingConfigSchema {
+		return (config as RewritingRuleProcessingConfigSchema).rule !== undefined;
+	}
+
+	private async handleProcessingConfig(
+		rules: GraphRewritingRuleSchema[],
+		processingConfig: (
+			| RewritingRuleProcessingConfigSchema
+			| RewritingNestedRuleProcessingConfigSchema
+		)[]
+	) {
+		for (const processStep of processingConfig) {
+			if (this.isRewritingRuleProcessingConfigSchema(processStep)) {
+				const ruleConfig = rules.find((rule) => rule.key === processStep.rule);
+
+				if (!ruleConfig) {
+					throw Error(`Rule "${processStep.rule}" not found`);
+				}
+
+				await this.executeRule(ruleConfig, processStep);
+			} else {
+				const repetitions = this.getRepetitionOption(processStep);
+				for (let i = 0; i < repetitions; i++) {
+					await this.handleProcessingConfig(rules, processStep.rules);
+				}
+			}
+		}
+	}
+
 	public async transformGraph(
 		hostgraphData: GraphSchema,
 		rules: GraphRewritingRuleSchema[] = [],
-		processingConfig: RewritingRuleProcessingConfigSchema[] = [],
+		processingConfig: (
+			| RewritingRuleProcessingConfigSchema
+			| RewritingNestedRuleProcessingConfigSchema
+		)[] = [],
 		options: GraphRewritingRequestSchema['options'] = {}
 	): Promise<ResultGraphSchema[]> {
 		logger.info('GraphTransformationService: Starting graph transformation.');
@@ -70,16 +107,7 @@ export class GraphTransformationService {
 		this.trackHistory = options?.returnHistory || false;
 
 		if (processingConfig.length) {
-			for (const processStep of processingConfig) {
-				const ruleConfig = rules.find((rule) => rule.key === processStep.rule);
-
-				if (!ruleConfig) {
-					throw Error(`Rule "${processStep.rule}" not found`);
-				}
-
-				await this.executeRule(ruleConfig, processStep);
-				logger.info(`rule executed`);
-			}
+			await this.handleProcessingConfig(rules, processingConfig);
 		} else {
 			// If no sequence config is given, run and replace only the first match
 			logger.info(
@@ -87,6 +115,7 @@ export class GraphTransformationService {
 			);
 			for (const rule of rules) {
 				await this.executeRule(rule);
+				logger.info(`rule executed`);
 			}
 		}
 
@@ -204,7 +233,9 @@ export class GraphTransformationService {
 	}
 
 	private getRepetitionOption(
-		sequenceConfig?: RewritingRuleProcessingConfigSchema
+		sequenceConfig?:
+			| RewritingRuleProcessingConfigSchema
+			| RewritingNestedRuleProcessingConfigSchema
 	) {
 		if (!sequenceConfig) return 1;
 		if (!sequenceConfig.options) return 1;
