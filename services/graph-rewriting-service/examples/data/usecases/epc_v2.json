@@ -1,0 +1,334 @@
+{
+    "hostgraph": {
+        "options": {
+            "type": "directed"
+        },
+        "nodes": [
+            {
+                "key": "Start",
+                "attributes": {
+                    "label": "Start",
+                    "type": "Event"
+                }
+            },
+            {
+                "key": "Ende",
+                "attributes": {
+                    "label": "Ende",
+                    "type": "Event"
+                }
+            }
+        ],
+        "edges": [
+            {
+                "key": "StartToEnde",
+                "source": "Start",
+                "target": "Ende",
+                "attributes": {}
+            }
+        ]
+    },
+    "rules": [
+        {
+            "key": "add_pattern",
+            "options": {
+                "homomorphic": false
+            },
+            "patternGraph": {
+                "options": {
+                    "type": "directed"
+                },
+                "nodes": [
+                    {
+                        "key": "A",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "B",
+                        "attributes": {}
+                    }
+                ],
+                "edges": [
+                    {
+                        "key": "aToB",
+                        "source": "A",
+                        "target": "B",
+                        "attributes": {}
+                    }
+                ]
+            },
+            "replacementGraph": {
+                "options": {
+                    "type": "directed"
+                },
+                "nodes": [
+                    {
+                        "key": "A",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "Pattern",
+                        "attributes": {
+                            "label": {
+                                "type": "randexp",
+                                "args": {
+                                    "pattern": "(AND-Rhombus|OR-Rhombus|XOR-Rhombus)",
+                                    "options": {}
+                                }
+                            },
+                            "type": "pattern"
+                        }
+                    },
+                    {
+                        "key": "B",
+                        "attributes": {}
+                    }
+                ],
+                "edges": [
+                    {
+                        "key": "AToPattern",
+                        "source": "A",
+                        "target": "Pattern",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "PatternToB",
+                        "source": "Pattern",
+                        "target": "B",
+                        "attributes": {}
+                    }
+                ]
+            }
+        },
+        {
+            "key": "replace_pattern_with_gate_sequence",
+            "options": {
+                "homomorphic": false
+            },
+            "patternGraph": {
+                "options": {
+                    "type": "directed"
+                },
+                "nodes": [
+                    {
+                        "key": "A",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "Pattern",
+                        "attributes": {
+                            "type": "pattern"
+                        }
+                    },
+                    {
+                        "key": "B",
+                        "attributes": {}
+                    }
+                ],
+                "edges": [
+                    {
+                        "key": "AToPattern",
+                        "source": "A",
+                        "target": "Pattern",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "PatternToB",
+                        "source": "Pattern",
+                        "target": "B",
+                        "attributes": {}
+                    }
+                ]
+            },
+            "replacementGraph": {
+                "options": {
+                    "type": "directed"
+                },
+                "nodes": [
+                    {
+                        "key": "A",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "Sequence1",
+                        "attributes": {
+                            "type": "Sequence"
+                        }
+                    },
+                    {
+                        "key": "Gate1",
+                        "attributes": {
+                            "type": "Gate",
+                            "label": {
+                                "type": "jsonLogic",
+                                "args": {
+                                    "rule": {
+                                        "if": [
+                                            {
+                                                "==": [
+                                                    "$.nodes.[?(@.key === 'Pattern')].attributes.label",
+                                                    "AND-Rhombus"
+                                                ]
+                                            },
+                                            "AND",
+                                            {
+                                                "==": [
+                                                    "$.nodes.[?(@.key === 'Pattern')].attributes.label",
+                                                    "OR-Rhombus"
+                                                ]
+                                            },
+                                            "OR",
+                                            {
+                                                "==": [
+                                                    "$.nodes.[?(@.key === 'Pattern')].attributes.label",
+                                                    "XOR-Rhombus"
+                                                ]
+                                            },
+                                            "XOR",
+                                            {
+                                                "var": ""
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "key": "Sequence2",
+                        "attributes": {
+                            "type": "Sequence"
+                        }
+                    },
+                    {
+                        "key": "Gate2",
+                        "attributes": {
+                            "type": "Gate",
+                            "label": {
+                                "type": "jsonLogic",
+                                "args": {
+                                    "rule": {
+                                        "if": [
+                                            {
+                                                "==": [
+                                                    "$.nodes.[?(@.key === 'Pattern')].attributes.label",
+                                                    "AND-Rhombus"
+                                                ]
+                                            },
+                                            "AND",
+                                            {
+                                                "==": [
+                                                    "$.nodes.[?(@.key === 'Pattern')].attributes.label",
+                                                    "OR-Rhombus"
+                                                ]
+                                            },
+                                            "OR",
+                                            {
+                                                "==": [
+                                                    "$.nodes.[?(@.key === 'Pattern')].attributes.label",
+                                                    "XOR-Rhombus"
+                                                ]
+                                            },
+                                            "XOR",
+                                            {
+                                                "var": ""
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "key": "Sequence3",
+                        "attributes": {
+                            "type": "Sequence"
+                        }
+                    },
+                    {
+                        "key": "B",
+                        "attributes": {}
+                    }
+                ],
+                "edges": [
+                    {
+                        "key": "AToSequence1",
+                        "source": "A",
+                        "target": "Sequence1",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "Sequence1toGate1",
+                        "source": "Sequence1",
+                        "target": "Gate1",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "Gate1ToSequence2",
+                        "source": "Gate1",
+                        "target": "Sequence2",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "Sequence2ToGate2",
+                        "source": "Sequence2",
+                        "target": "Gate2",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "Gate2ToSequence3",
+                        "source": "Gate2",
+                        "target": "Sequence3",
+                        "attributes": {}
+                    },
+                    {
+                        "key": "Sequence3ToB",
+                        "source": "Sequence3",
+                        "target": "B",
+                        "attributes": {}
+                    }
+                ]
+            }
+        }
+    ],
+    "sequence": [
+        {
+            "rules": [
+                {
+                    "rule": "add_pattern",
+                    "options": {
+                        "mode": "interval",
+                        "interval": {
+                            "min": 1,
+                            "max": 4
+                        },
+                        "repeat": [
+                            1,
+                            1
+                        ]
+                    }
+                },
+                {
+                    "rule": "replace_pattern_with_gate_sequence",
+                    "options": {
+                        "mode": "all"
+                    }
+                }
+            ],
+            "options": {
+                "mode": "interval",
+                "interval": {
+                    "min": 1,
+                    "max": 4
+                },
+                "repeat": [
+                    1,
+                    4
+                ]
+            }
+        }
+    ],
+    "options": {
+        "returnHistory": true
+    }
+}
