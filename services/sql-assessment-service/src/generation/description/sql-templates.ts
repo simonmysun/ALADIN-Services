@@ -1,4 +1,3 @@
-
 export const SQL_TEMPLATES: { [key: string]: string } = {
     "SELECT_ALL": "Retrieve all information about the {table} in the {database} database.",
     "SELECT_COLUMNS": "Retrieve {columns} in the {database} database.",

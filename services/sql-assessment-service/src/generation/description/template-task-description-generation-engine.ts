@@ -1,5 +1,5 @@
-import { AST, BaseFrom, Binary, Column, ColumnRefItem, From, Join, Select } from "node-sql-parser";
-import { SQL_TEMPLATES } from "./sql-templates";
+import { AST, BaseFrom, Binary, ColumnRefItem, Join, Select } from 'node-sql-parser';
+import { SQL_TEMPLATES } from './sql-templates';
 
 export class TemplateTaskDescriptionGenerationEngine {
 
@@ -69,7 +69,6 @@ export class TemplateTaskDescriptionGenerationEngine {
                 result += isSelectAll
                     ? SQL_TEMPLATES.SELECT_ALL.replace('{table}', this.formatName(table)).replace('{database}', schema)
                     : SQL_TEMPLATES.SELECT_COLUMNS.replace('{columns}', columns).replace('{table}', this.formatName(table)).replace('{database}', schema);
-
             }
             else {
                 result += 'Unsupported FROM clause structure.';
@@ -166,8 +165,6 @@ export class TemplateTaskDescriptionGenerationEngine {
                 .replace('{right}', right);
         }
 
-
-
         return 'an unspecified condition';
     }
 
@@ -191,9 +188,9 @@ export class TemplateTaskDescriptionGenerationEngine {
         const parseColumn = (columnString: string): ColumnRefItem => {
             const match = columnString.match(/^([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)$/);
             if (match) {
-                return { table: match[1], column: match[2], type: "column_ref" };
+                return { table: match[1], column: match[2], type: 'column_ref' };
             }
-            return { table: '', column: columnString, type: "column_ref" };
+            return { table: '', column: columnString, type: 'column_ref' };
         };
 
         const leftColumn = parseColumn(left);
@@ -211,8 +208,8 @@ export class TemplateTaskDescriptionGenerationEngine {
 
             if (func && arg) {
                 const aggTemplate = SQL_TEMPLATES[func.toUpperCase()] || func.toLowerCase();
-                let column = typeof (arg.column) === "string" ? arg.column : arg.column.expr.value;
-                return aggTemplate.replace('{column}', this.formatName(column || 'unknown column', func));
+                let col = typeof (arg.column) === 'string' ? arg.column : arg.column.expr.value;
+                return aggTemplate.replace('{column}', this.formatName(col || 'unknown column', func));
             }
         }
 
@@ -248,7 +245,7 @@ export class TemplateTaskDescriptionGenerationEngine {
         return this.separateWords(formattedColumn);
     }
 
-    private separateWords(str: string) {
+    private separateWords(str: string): string {
         const regex = /([a-z0-9])([A-Z])|([_-])([a-zA-Z0-9])/g;
         return str.replace(regex, (match, p1, p2, p3, p4) => {
             if (p1 && p2) {
@@ -273,5 +270,4 @@ export class TemplateTaskDescriptionGenerationEngine {
             default: return 'Perform an unspecified join.';
         }
     }
-
 }
