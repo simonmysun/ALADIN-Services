@@ -1,5 +1,5 @@
 import { AST } from 'node-sql-parser';
-import { GenerationOptions, GptOptions, IAliasMap } from '../../shared/interfaces/domain';
+import { GenerationOptions, GptOptions, IAliasMap, IParsedTable } from '../../shared/interfaces/domain';
 import { LLMTaskDescriptionGenerationEngine } from './llm-task-description-generation-engine';
 import { TemplateTaskDescriptionGenerationEngine } from './template-task-description-generation-engine';
 
@@ -24,21 +24,30 @@ export class TaskDescriptionGenerationService {
         databaseKey: string,
         isSelfJoin?: boolean,
         option?: GptOptions,
-        schemaAliasMap?: IAliasMap
+        schemaAliasMap?: IAliasMap,
+        tables?: IParsedTable[]
     ): Promise<string> {
         switch (generationType) {
             case 'template':
-                return this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(queryAST, schema, schemaAliasMap);
+                return this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(
+                    queryAST, schema, schemaAliasMap, tables
+                );
 
             case 'llm':
                 if (!option) {
                     throw Error('Undefined GPT configuration');
                 }
-                return await this.llmTaskDescriptionGenerationEngine.generateTaskFromQuery(query, databaseKey, option, isSelfJoin);
+                return await this.llmTaskDescriptionGenerationEngine.generateTaskFromQuery(
+                    query, databaseKey, option, isSelfJoin
+                );
 
             case 'hybrid': {
-                const templateDescription = this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(queryAST, schema, schemaAliasMap);
-                return await this.llmTaskDescriptionGenerationEngine.generateNLGTaskFromTemplateTask(query, templateDescription, databaseKey);
+                const templateDescription = this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(
+                    queryAST, schema, schemaAliasMap, tables
+                );
+                return await this.llmTaskDescriptionGenerationEngine.generateNLGTaskFromTemplateTask(
+                    query, templateDescription, databaseKey
+                );
             }
 
             default:

@@ -1,25 +1,53 @@
 export const SQL_TEMPLATES: { [key: string]: string } = {
+    // -------------------------------------------------------------------------
+    // SELECT — simple (no JOIN)
+    // -------------------------------------------------------------------------
     "SELECT_ALL": "Retrieve all information about the {table} in the {database} database.",
     "SELECT_COLUMNS": "Retrieve {columns} in the {database} database.",
+    /** DISTINCT variants — used when SELECT DISTINCT is present */
+    "SELECT_DISTINCT_COLUMNS": "Retrieve unique {columns} in the {database} database.",
+
+    // -------------------------------------------------------------------------
+    // SELECT — with JOIN
+    // -------------------------------------------------------------------------
     "SELECT_ALL_JOIN": "Retrieve all information about the following data combination in the {database} database.",
     "SELECT_COLUMNS_JOIN": "Retrieve {columns} from the following data combination in the {database} database.",
+    /** DISTINCT variant for JOIN queries */
+    "SELECT_DISTINCT_COLUMNS_JOIN": "Retrieve unique {columns} from the following data combination in the {database} database.",
 
+    // -------------------------------------------------------------------------
+    // Boolean operators (used when combining WHERE / HAVING sub-conditions)
+    // -------------------------------------------------------------------------
     "AND": "{left} and {right}",
     "OR": "{left} or {right}",
 
+    // -------------------------------------------------------------------------
+    // JOIN types
+    // -------------------------------------------------------------------------
     "SELF_JOIN": "Match records within the {table} table where {condition}.",
     "INNER_JOIN": "Combine the data from the {table1} table and the {table2} table.",
     "LEFT_JOIN": "Include all data from the {table1} table and the matching data from the {table2} table.",
     "RIGHT_JOIN": "Include all data from the {table2} table and the matching data from the {table1} table.",
     "FULL_JOIN": "Include all records from both the {table1} table and the {table2} table.",
     "CROSS_JOIN": "Combine each record from the {table1} table with each record from the {table2} table.",
+    /**
+     * Used when a weak or associative entity is skipped in a JOIN chain.
+     * The two placeholders represent the flanking strong entities.
+     */
+    "WEAK_BRIDGE": "Retrieve {table2} data related to each {table1}.",
 
+    // -------------------------------------------------------------------------
+    // Aggregate functions
+    // -------------------------------------------------------------------------
     "AVG": "the average of {column}",
     "SUM": "the sum of {column}",
     "COUNT": "the number of {column}",
     "MAX": "the maximum {column}",
     "MIN": "the minimum {column}",
 
+    // -------------------------------------------------------------------------
+    // Comparison / predicate operators
+    // -------------------------------------------------------------------------
     "=": "{left} equals {right}",
     ">": "{left} is greater than {right}",
     "<": "{left} is less than {right}",
@@ -36,8 +64,37 @@ export const SQL_TEMPLATES: { [key: string]: string } = {
     "IS": "{left} is {right}",
     "IS NOT": "{left} is not {right}",
 
+    // -------------------------------------------------------------------------
+    // Subquery existence predicates
+    // -------------------------------------------------------------------------
+    "EXISTS": "there exists a related record where {condition}",
+    "NOT_EXISTS": "there is no related record where {condition}",
+
+    // -------------------------------------------------------------------------
+    // CASE expression (in SELECT column list)
+    // -------------------------------------------------------------------------
+    "CASE": "a conditional value based on {conditions}",
+
+    // -------------------------------------------------------------------------
+    // Clauses that follow the FROM / JOIN block
+    // -------------------------------------------------------------------------
     "WHERE": "Filter the results where {condition}.",
     "GROUP_BY": "Group the results based on {columns}.",
     "HAVING": "Filter the grouped results where {condition}.",
     "ORDER_BY": "Sort the results by {columns}.",
+
+    // -------------------------------------------------------------------------
+    // LIMIT / OFFSET
+    // -------------------------------------------------------------------------
+    "LIMIT": "Limit the results to {count} record(s).",
+    "OFFSET": "Skip the first {count} record(s).",
+    "LIMIT_OFFSET": "Limit the results to {count} record(s), starting from record {offset}.",
+
+    // -------------------------------------------------------------------------
+    // Set operations — chained via node._next in the AST
+    // -------------------------------------------------------------------------
+    "UNION": "{left} Additionally retrieve: {right}",
+    "UNION_ALL": "{left} Additionally retrieve (including duplicates): {right}",
+    "INTERSECT": "{left} Only include results that also appear in: {right}",
+    "EXCEPT": "{left} Excluding results that appear in: {right}",
 };
