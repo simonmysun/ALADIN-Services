@@ -314,7 +314,10 @@ export class GradingController {
                 schema,
                 databaseKey,
                 undefined,
-                resolvedGptOption
+                resolvedGptOption,
+                undefined,
+                undefined,
+                lang
             );
         } else {
             // Legacy default behaviour: Hybrid for supported types, LLM otherwise
@@ -328,7 +331,12 @@ export class GradingController {
                     studentQuery,
                     studentAST,
                     schema,
-                    databaseKey
+                    databaseKey,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    lang
                 );
             } else {
                 studentTaskDescription = await this.taskDescriptionGenerationService.generateTaskFromQuery(
@@ -338,7 +346,10 @@ export class GradingController {
                     schema,
                     databaseKey,
                     undefined,
-                    GptOptions.Default
+                    GptOptions.Default,
+                    undefined,
+                    undefined,
+                    lang
                 );
             }
         }

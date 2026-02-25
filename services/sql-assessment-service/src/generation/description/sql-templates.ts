@@ -1,3 +1,15 @@
+import { SupportedLanguage } from '../../shared/i18n';
+import { SQL_TEMPLATES_DE } from './sql-templates-de';
+
+/**
+ * Returns the SQL template map for the given language.
+ * Falls back to English for any unsupported language.
+ */
+export function getTemplates(lang: SupportedLanguage): { [key: string]: string } {
+    if (lang === 'de') return SQL_TEMPLATES_DE;
+    return SQL_TEMPLATES;
+}
+
 export const SQL_TEMPLATES: { [key: string]: string } = {
     // -------------------------------------------------------------------------
     // SELECT — simple (no JOIN)

@@ -106,7 +106,6 @@ export class DescriptionController {
         if (!validated) return res;
 
         const { options, databaseKey, lang } = validated;
-        // TODO: pass languageCode to TemplateTaskDescriptionGenerationEngine when i18n is supported
         const languageCode = options.languageCode ?? 'en';
 
         let ast: any;
@@ -123,7 +122,11 @@ export class DescriptionController {
                 ast,
                 options.connectionInfo.schema!,
                 databaseKey,
-                options.isSelfJoin ?? false
+                options.isSelfJoin ?? false,
+                undefined,
+                undefined,
+                undefined,
+                lang
             );
 
             const response: DescriptionResponse = { description, languageCode };
@@ -143,7 +146,6 @@ export class DescriptionController {
         if (!validated) return res;
 
         const { options, databaseKey, lang } = validated;
-        // TODO: pass languageCode to LLMTaskDescriptionGenerationEngine when i18n is supported
         const languageCode = options.languageCode ?? 'en';
 
         try {
@@ -154,7 +156,10 @@ export class DescriptionController {
                 options.connectionInfo.schema!,
                 databaseKey,
                 options.isSelfJoin ?? false,
-                GptOptions.Default
+                GptOptions.Default,
+                undefined,
+                undefined,
+                lang
             );
 
             const response: DescriptionResponse = { description, languageCode };
@@ -174,7 +179,6 @@ export class DescriptionController {
         if (!validated) return res;
 
         const { options, databaseKey, lang } = validated;
-        // TODO: pass languageCode to LLMTaskDescriptionGenerationEngine when i18n is supported
         const languageCode = options.languageCode ?? 'en';
 
         try {
@@ -185,7 +189,10 @@ export class DescriptionController {
                 options.connectionInfo.schema!,
                 databaseKey,
                 options.isSelfJoin ?? false,
-                GptOptions.Creative
+                GptOptions.Creative,
+                undefined,
+                undefined,
+                lang
             );
 
             const response: DescriptionResponse = { description, languageCode };
@@ -205,7 +212,6 @@ export class DescriptionController {
         if (!validated) return res;
 
         const { options, databaseKey, lang } = validated;
-        // TODO: pass languageCode to LLMTaskDescriptionGenerationEngine when i18n is supported
         const languageCode = options.languageCode ?? 'en';
 
         try {
@@ -216,7 +222,10 @@ export class DescriptionController {
                 options.connectionInfo.schema!,
                 databaseKey,
                 options.isSelfJoin ?? false,
-                GptOptions.MultiStep
+                GptOptions.MultiStep,
+                undefined,
+                undefined,
+                lang
             );
 
             const response: DescriptionResponse = { description, languageCode };
@@ -236,7 +245,6 @@ export class DescriptionController {
         if (!validated) return res;
 
         const { options, databaseKey, lang } = validated;
-        // TODO: pass languageCode to both engines when i18n is supported
         const languageCode = options.languageCode ?? 'en';
 
         let ast: any;
@@ -253,7 +261,11 @@ export class DescriptionController {
                 ast,
                 options.connectionInfo.schema!,
                 databaseKey,
-                options.isSelfJoin ?? false
+                options.isSelfJoin ?? false,
+                undefined,
+                undefined,
+                undefined,
+                lang
             );
 
             const response: DescriptionResponse = { description, languageCode };

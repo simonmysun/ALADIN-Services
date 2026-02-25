@@ -5,6 +5,13 @@ import { databaseMetadata, selfJoinDatabaseMetadata } from '../../database/inter
 import { SystemMessage } from '@langchain/core/messages';
 import { GptOptions, IParsedTable } from '../../shared/interfaces/domain';
 import { RunnableLambda, RunnableSequence } from '@langchain/core/runnables';
+import { SupportedLanguage } from '../../shared/i18n';
+
+/** Maps a supported language code to a natural-language directive injected into prompts. */
+const LANGUAGE_DIRECTIVES: Record<SupportedLanguage, string> = {
+    en: 'Respond in English.',
+    de: 'Antworte auf Deutsch.',
+};
 
 export class LLMTaskDescriptionGenerationEngine {
     constructor() {
@@ -54,14 +61,15 @@ export class LLMTaskDescriptionGenerationEngine {
         databaseKey: string,
         option: GptOptions,
         isSelfJoin?: boolean,
+        lang: SupportedLanguage = 'en',
     ): Promise<string> {
         switch (option) {
             case 'creative':
-                return await this.generateTaskFromQueryCreative(query, databaseKey, isSelfJoin);
+                return await this.generateTaskFromQueryCreative(query, databaseKey, isSelfJoin, lang);
             case 'multi-step':
-                return await this.generateTaskFromQueryMultiStep(query, databaseKey, isSelfJoin);
+                return await this.generateTaskFromQueryMultiStep(query, databaseKey, isSelfJoin, lang);
             case 'default':
-                return await this.generateTaskFromQueryNotCreative(query, databaseKey, isSelfJoin);
+                return await this.generateTaskFromQueryNotCreative(query, databaseKey, isSelfJoin, lang);
             default:
                 return 'Unknown option selected.';
         }
@@ -100,15 +108,22 @@ export class LLMTaskDescriptionGenerationEngine {
         return tables;
     }
 
+    /** Returns the language directive system message for the given language. */
+    private languageMessage(lang: SupportedLanguage): SystemMessage {
+        return new SystemMessage(LANGUAGE_DIRECTIVES[lang] ?? LANGUAGE_DIRECTIVES['en']);
+    }
+
     private async generateTaskFromQueryMultiStep(
         query: string,
         databaseKey: string,
         isSelfJoin?: boolean,
+        lang: SupportedLanguage = 'en',
     ): Promise<string> {
         const tables = this.resolveMetadata(databaseKey, isSelfJoin);
         let queryParts = this.splitSQLQuery(query);
 
         const schemaString = this.serializeSchemaForPrompt(tables);
+        const langDirective = LANGUAGE_DIRECTIVES[lang] ?? LANGUAGE_DIRECTIVES['en'];
 
         const sequence = RunnableSequence.from([
             new RunnableLambda({
@@ -164,6 +179,7 @@ export class LLMTaskDescriptionGenerationEngine {
                         new SystemMessage(
                             `Based on the following semantic descriptions of query parts: {query_part_results}, create natural-language question that describes the requested data. The question should include all required information to formulate a query that returns the requested data. Return only the question.`,
                         ),
+                        new SystemMessage(langDirective),
                     ]).pipe(this.openai);
 
                     const response = await taskPrompt.invoke({
@@ -189,6 +205,7 @@ export class LLMTaskDescriptionGenerationEngine {
         query: string,
         databaseKey: string,
         isSelfJoin?: boolean,
+        lang: SupportedLanguage = 'en',
     ): Promise<string> {
         const tables = this.resolveMetadata(databaseKey, isSelfJoin);
 
@@ -197,7 +214,7 @@ export class LLMTaskDescriptionGenerationEngine {
         );
         const querySystemMessage = new SystemMessage(`This is the query: ${query}`);
         const schemaSystemMessage = new SystemMessage(`This is the schema: ${this.serializeSchemaForPrompt(tables)}`);
-        const messages = [systemMessage, querySystemMessage, schemaSystemMessage];
+        const messages = [systemMessage, querySystemMessage, schemaSystemMessage, this.languageMessage(lang)];
 
         try {
             const response = await this.creativeOpenai.invoke(messages);
@@ -212,6 +229,7 @@ export class LLMTaskDescriptionGenerationEngine {
         query: string,
         databaseKey: string,
         isSelfJoin?: boolean,
+        lang: SupportedLanguage = 'en',
     ): Promise<string> {
         const tables = this.resolveMetadata(databaseKey, isSelfJoin);
 
@@ -220,7 +238,7 @@ export class LLMTaskDescriptionGenerationEngine {
         );
         const querySystemMessage = new SystemMessage(`This is the query: ${query}`);
         const schemaSystemMessage = new SystemMessage(`This is the schema: ${this.serializeSchemaForPrompt(tables)}`);
-        const messages = [systemMessage, querySystemMessage, schemaSystemMessage];
+        const messages = [systemMessage, querySystemMessage, schemaSystemMessage, this.languageMessage(lang)];
 
         try {
             const response = await this.openai.invoke(messages);
@@ -236,6 +254,7 @@ export class LLMTaskDescriptionGenerationEngine {
         taskDescription: string,
         databaseKey: string,
         isSelfJoin?: boolean,
+        lang: SupportedLanguage = 'en',
     ): Promise<string> {
         const tables = this.resolveMetadata(databaseKey, isSelfJoin);
 
@@ -249,7 +268,7 @@ export class LLMTaskDescriptionGenerationEngine {
             `This is the task description that you should improve: ${taskDescription}`,
         );
 
-        const messages = [systemMessage, querySystemMessage, schemaSystemMessage, taskMessage];
+        const messages = [systemMessage, querySystemMessage, schemaSystemMessage, taskMessage, this.languageMessage(lang)];
 
         try {
             const response = await this.openai.invoke(messages);

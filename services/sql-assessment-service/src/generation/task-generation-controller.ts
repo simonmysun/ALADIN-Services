@@ -96,19 +96,24 @@ export class TaskGenerationController {
             try {
                 const isSelfJoin = taskContext.joinTypes.includes('SELF JOIN');
                 taskDescription = await this.taskDescriptionGenerationService.generateTaskFromQuery(
-                    GenerationOptions.Template, query, ast, connectionInfo.schema!, databaseKey, isSelfJoin
+                    GenerationOptions.Template, query, ast, connectionInfo.schema!, databaseKey, isSelfJoin,
+                    undefined, undefined, undefined, lang
                 );
                 entityDescription = await this.taskDescriptionGenerationService.generateTaskFromQuery(
-                    GenerationOptions.LLM, query, ast, connectionInfo.schema!, databaseKey, isSelfJoin, GptOptions.MultiStep
+                    GenerationOptions.LLM, query, ast, connectionInfo.schema!, databaseKey, isSelfJoin,
+                    GptOptions.MultiStep, undefined, undefined, lang
                 );
                 creativeDescription = await this.taskDescriptionGenerationService.generateTaskFromQuery(
-                    GenerationOptions.LLM, query, ast, connectionInfo.schema!, databaseKey, isSelfJoin, GptOptions.Creative
+                    GenerationOptions.LLM, query, ast, connectionInfo.schema!, databaseKey, isSelfJoin,
+                    GptOptions.Creative, undefined, undefined, lang
                 );
                 schemaBasedDescription = await this.taskDescriptionGenerationService.generateTaskFromQuery(
-                    GenerationOptions.LLM, query, ast, connectionInfo.schema!, databaseKey, isSelfJoin, GptOptions.Default
+                    GenerationOptions.LLM, query, ast, connectionInfo.schema!, databaseKey, isSelfJoin,
+                    GptOptions.Default, undefined, undefined, lang
                 );
                 semanticNGL = await this.taskDescriptionGenerationService.generateTaskFromQuery(
-                    GenerationOptions.Hybrid, query, ast, connectionInfo.schema!, databaseKey, isSelfJoin
+                    GenerationOptions.Hybrid, query, ast, connectionInfo.schema!, databaseKey, isSelfJoin,
+                    undefined, undefined, undefined, lang
                 );
             } catch (error) {
                 console.log('Error in task description generation', error);

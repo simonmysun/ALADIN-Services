@@ -1,6 +1,7 @@
 import { AST, BaseFrom, Binary, ColumnRefItem, Join, Select } from 'node-sql-parser';
-import { SQL_TEMPLATES } from './sql-templates';
+import { getTemplates } from './sql-templates';
 import { EntityType, IAliasMap, IParsedTable } from '../../shared/interfaces/domain';
+import { SupportedLanguage } from '../../shared/i18n';
 
 // ---------------------------------------------------------------------------
 // Internal helper types
@@ -29,20 +30,22 @@ export class TemplateTaskDescriptionGenerationEngine {
     /**
      * Converts a parsed SQL AST into a human-readable task description.
      *
-     * @param query         - The root AST node returned by node-sql-parser.
-     * @param schema        - Database / schema name used in sentence framing.
+     * @param query          - The root AST node returned by node-sql-parser.
+     * @param schema         - Database / schema name used in sentence framing.
      * @param schemaAliasMap - Optional display-name overrides for tables / columns.
-     * @param tables        - Optional full schema metadata; when provided the engine
-     *                        uses entity-type information (weak / associative entities)
-     *                        to simplify JOIN descriptions.
+     * @param tables         - Optional full schema metadata; when provided the engine
+     *                         uses entity-type information (weak / associative entities)
+     *                         to simplify JOIN descriptions.
+     * @param lang           - Language code for the output description (default: 'en').
      */
     public generateTaskFromQuery(
         query: AST,
         schema: string,
         schemaAliasMap?: IAliasMap,
-        tables?: IParsedTable[]
+        tables?: IParsedTable[],
+        lang: SupportedLanguage = 'en'
     ): string {
-        return this.traverseAST(query, schema, schemaAliasMap, tables);
+        return this.traverseAST(query, schema, schemaAliasMap, tables, lang);
     }
 
     // -------------------------------------------------------------------------
@@ -53,13 +56,14 @@ export class TemplateTaskDescriptionGenerationEngine {
         node: AST,
         schema: string,
         schemaAliasMap?: IAliasMap,
-        tables?: IParsedTable[]
+        tables?: IParsedTable[],
+        lang: SupportedLanguage = 'en'
     ): string {
         if (!node) return '';
 
         switch (node.type) {
             case 'select':
-                return this.handleSelect(node, schema, schemaAliasMap, tables);
+                return this.handleSelect(node, schema, schemaAliasMap, tables, lang);
             default:
                 return 'Unsupported query type.';
         }
@@ -69,8 +73,10 @@ export class TemplateTaskDescriptionGenerationEngine {
         node: Select,
         schema: string,
         schemaAliasMap?: IAliasMap,
-        tables?: IParsedTable[]
+        tables?: IParsedTable[],
+        lang: SupportedLanguage = 'en'
     ): string {
+        const T = getTemplates(lang);
         let result = '';
         const isSelectAll = node.columns.length === 1 && (node.columns[0] as any).expr?.column === '*';
         // node-sql-parser emits distinct as { type: 'DISTINCT' } when present.
@@ -86,17 +92,17 @@ export class TemplateTaskDescriptionGenerationEngine {
                 const columns = isSelectAll
                     ? '*'
                     : (node.columns as any[])
-                        .map(col => this.getColumnName(col.expr, aliasMap, schemaAliasMap))
+                        .map(col => this.getColumnName(col.expr, aliasMap, schemaAliasMap, lang))
                         .join(' and ');
 
                 if (isSelectAll) {
-                    result += SQL_TEMPLATES.SELECT_ALL_JOIN.replace('{database}', schema);
+                    result += T.SELECT_ALL_JOIN.replace('{database}', schema);
                 } else if (isDistinct) {
-                    result += SQL_TEMPLATES.SELECT_DISTINCT_COLUMNS_JOIN
+                    result += T.SELECT_DISTINCT_COLUMNS_JOIN
                         .replace('{columns}', columns)
                         .replace('{database}', schema);
                 } else {
-                    result += SQL_TEMPLATES.SELECT_COLUMNS_JOIN
+                    result += T.SELECT_COLUMNS_JOIN
                         .replace('{columns}', columns)
                         .replace('{database}', schema);
                 }
@@ -111,7 +117,7 @@ export class TemplateTaskDescriptionGenerationEngine {
                         condition: j.on,
                     }));
 
-                result += this.renderJoinHops(baseTableRaw, hops, aliasMap, schemaAliasMap, tables);
+                result += this.renderJoinHops(baseTableRaw, hops, aliasMap, schemaAliasMap, tables, lang);
             }
             else if ((node.from as BaseFrom[]).every(fromItem => fromItem?.table)) {
                 // ── Simple (no JOIN) query ────────────────────────────────────
@@ -119,19 +125,19 @@ export class TemplateTaskDescriptionGenerationEngine {
                 const columns = isSelectAll
                     ? '*'
                     : (node.columns as any[])
-                        .map(col => this.getColumnName(col.expr, aliasMap, schemaAliasMap))
+                        .map(col => this.getColumnName(col.expr, aliasMap, schemaAliasMap, lang))
                         .join(' and ');
 
                 if (isSelectAll) {
-                    result += SQL_TEMPLATES.SELECT_ALL
+                    result += T.SELECT_ALL
                         .replace('{table}', this.formatTableName(table, schemaAliasMap))
                         .replace('{database}', schema);
                 } else if (isDistinct) {
-                    result += SQL_TEMPLATES.SELECT_DISTINCT_COLUMNS
+                    result += T.SELECT_DISTINCT_COLUMNS
                         .replace('{columns}', columns)
                         .replace('{database}', schema);
                 } else {
-                    result += SQL_TEMPLATES.SELECT_COLUMNS
+                    result += T.SELECT_COLUMNS
                         .replace('{columns}', columns)
                         .replace('{table}', this.formatTableName(table, schemaAliasMap))
                         .replace('{database}', schema);
@@ -148,40 +154,40 @@ export class TemplateTaskDescriptionGenerationEngine {
         // ── Clauses ──────────────────────────────────────────────────────────
 
         if (node.where) {
-            const condition = this.handleCondition(node.where, aliasMap, schemaAliasMap, tables);
-            result += ' ' + SQL_TEMPLATES.WHERE.replace('{condition}', condition);
+            const condition = this.handleCondition(node.where, aliasMap, schemaAliasMap, tables, lang);
+            result += ' ' + T.WHERE.replace('{condition}', condition);
         }
 
         if (node.groupby && (node.groupby as any).columns && (node.groupby as any).columns.length > 0) {
             const groupByColumns = (node.groupby as any).columns
-                .map((col: any) => this.getColumnName(col, aliasMap, schemaAliasMap))
+                .map((col: any) => this.getColumnName(col, aliasMap, schemaAliasMap, lang))
                 .join(', ');
-            result += ' ' + SQL_TEMPLATES.GROUP_BY.replace('{columns}', groupByColumns);
+            result += ' ' + T.GROUP_BY.replace('{columns}', groupByColumns);
         }
 
         if (node.having) {
-            const havingCondition = this.handleCondition(node.having, aliasMap, schemaAliasMap, tables);
-            result += ' ' + SQL_TEMPLATES.HAVING.replace('{condition}', havingCondition);
+            const havingCondition = this.handleCondition(node.having, aliasMap, schemaAliasMap, tables, lang);
+            result += ' ' + T.HAVING.replace('{condition}', havingCondition);
         }
 
         if (node.orderby) {
             const orderByColumns = (node.orderby as any[]).map((col: any) => {
-                const columnName = this.getColumnName(col.expr, aliasMap, schemaAliasMap);
+                const columnName = this.getColumnName(col.expr, aliasMap, schemaAliasMap, lang);
                 const orderType = col.type?.toUpperCase() === 'DESC' ? 'descending' : 'ascending';
                 return `${columnName} in ${orderType} order`;
             }).join(', ');
-            result += ' ' + SQL_TEMPLATES.ORDER_BY.replace('{columns}', orderByColumns);
+            result += ' ' + T.ORDER_BY.replace('{columns}', orderByColumns);
         }
 
         // ── LIMIT / OFFSET ───────────────────────────────────────────────────
-        result += this.handleLimit(node);
+        result += this.handleLimit(node, lang);
 
         // ── Set operations (UNION / INTERSECT / EXCEPT) ──────────────────────
         const nodeAny = node as any;
         if (nodeAny._next && nodeAny.set_op) {
             const setOpKey = (nodeAny.set_op as string).toUpperCase().replace(/ /g, '_');
-            const rightDesc = this.traverseAST(nodeAny._next as AST, schema, schemaAliasMap, tables);
-            const template = SQL_TEMPLATES[setOpKey];
+            const rightDesc = this.traverseAST(nodeAny._next as AST, schema, schemaAliasMap, tables, lang);
+            const template = T[setOpKey];
             result = template
                 ? template.replace('{left}', result).replace('{right}', rightDesc)
                 : `${result} ${nodeAny.set_op.toUpperCase()} ${rightDesc}`;
@@ -207,8 +213,10 @@ export class TemplateTaskDescriptionGenerationEngine {
         hops: JoinHop[],
         aliasMap: Record<string, string>,
         schemaAliasMap?: IAliasMap,
-        tables?: IParsedTable[]
+        tables?: IParsedTable[],
+        lang: SupportedLanguage = 'en'
     ): string {
+        const T = getTemplates(lang);
         let result = '';
         let prevStrongTableRaw = baseTableRaw;
         let i = 0;
@@ -221,8 +229,8 @@ export class TemplateTaskDescriptionGenerationEngine {
             // ── SELF JOIN ────────────────────────────────────────────────────
             if (isSelf) {
                 const baseDisplay = this.formatTableName(prevStrongTableRaw, schemaAliasMap);
-                const condition = this.handleJoinCondition(hop.condition, aliasMap, schemaAliasMap);
-                result += ' ' + SQL_TEMPLATES.SELF_JOIN
+                const condition = this.handleJoinCondition(hop.condition, aliasMap, schemaAliasMap, lang);
+                result += ' ' + T.SELF_JOIN
                     .replace('{table}', baseDisplay)
                     .replace('{condition}', condition);
                 i++;
@@ -237,7 +245,7 @@ export class TemplateTaskDescriptionGenerationEngine {
                     // Emit a single WEAK_BRIDGE sentence for prev → next
                     const t1 = this.formatTableName(prevStrongTableRaw, schemaAliasMap);
                     const t2 = this.formatTableName(nextHop.table, schemaAliasMap);
-                    result += ' ' + SQL_TEMPLATES.WEAK_BRIDGE
+                    result += ' ' + T.WEAK_BRIDGE
                         .replace('{table1}', t1)
                         .replace('{table2}', t2);
                     prevStrongTableRaw = nextHop.table;
@@ -249,10 +257,10 @@ export class TemplateTaskDescriptionGenerationEngine {
             }
 
             // ── Normal JOIN ──────────────────────────────────────────────────
-            const joinTemplate = this.getJoinTemplate(hop.joinType);
+            const joinTemplate = this.getJoinTemplate(hop.joinType, lang);
             const t1 = this.formatTableName(prevStrongTableRaw, schemaAliasMap);
             const t2 = this.formatTableName(hop.table, schemaAliasMap);
-            const condition = this.handleJoinCondition(hop.condition, aliasMap, schemaAliasMap);
+            const condition = this.handleJoinCondition(hop.condition, aliasMap, schemaAliasMap, lang);
 
             result += ' ' + joinTemplate
                 .replace('{table1}', t1)
@@ -271,7 +279,8 @@ export class TemplateTaskDescriptionGenerationEngine {
     // LIMIT / OFFSET
     // -------------------------------------------------------------------------
 
-    private handleLimit(node: Select): string {
+    private handleLimit(node: Select, lang: SupportedLanguage = 'en'): string {
+        const T = getTemplates(lang);
         const limitNode = (node as any).limit;
         if (!limitNode) return '';
 
@@ -284,12 +293,12 @@ export class TemplateTaskDescriptionGenerationEngine {
         const offsetVal: number | null = values[1]?.value ?? null;
 
         if (limitVal !== null && offsetVal !== null) {
-            return ' ' + SQL_TEMPLATES.LIMIT_OFFSET
+            return ' ' + T.LIMIT_OFFSET
                 .replace('{count}', String(limitVal))
                 .replace('{offset}', String(offsetVal));
         }
         if (limitVal !== null) {
-            return ' ' + SQL_TEMPLATES.LIMIT.replace('{count}', String(limitVal));
+            return ' ' + T.LIMIT.replace('{count}', String(limitVal));
         }
         return '';
     }
@@ -315,8 +324,10 @@ export class TemplateTaskDescriptionGenerationEngine {
     private handleJoinCondition(
         on: string | any,
         aliasMap: Record<string, string> = {},
-        schemaAliasMap?: IAliasMap
+        schemaAliasMap?: IAliasMap,
+        lang: SupportedLanguage = 'en'
     ): string {
+        const T = getTemplates(lang);
         let left: any, operator: string, right: any;
         if (typeof on === 'string') {
             [left, operator, right] = this.parseConditionString(on);
@@ -328,9 +339,9 @@ export class TemplateTaskDescriptionGenerationEngine {
         else {
             return 'an unspecified condition';
         }
-        const operatorTemplate = SQL_TEMPLATES[operator!] || `{left} ${operator!} {right}`;
-        const formattedLeft = this.getColumnName(left, aliasMap, schemaAliasMap);
-        const formattedRight = right?.value ?? this.getColumnName(right, aliasMap, schemaAliasMap);
+        const operatorTemplate = T[operator!] || `{left} ${operator!} {right}`;
+        const formattedLeft = this.getColumnName(left, aliasMap, schemaAliasMap, lang);
+        const formattedRight = right?.value ?? this.getColumnName(right, aliasMap, schemaAliasMap, lang);
 
         return operatorTemplate
             .replace('{left}', formattedLeft)
@@ -345,15 +356,17 @@ export class TemplateTaskDescriptionGenerationEngine {
         condition: any,
         aliasMap: Record<string, string> = {},
         schemaAliasMap?: IAliasMap,
-        tables?: IParsedTable[]
+        tables?: IParsedTable[],
+        lang: SupportedLanguage = 'en'
     ): string {
+        const T = getTemplates(lang);
         if (!condition) return 'an unspecified condition';
 
         // AND / OR
         if (condition.operator === 'AND' || condition.operator === 'OR') {
-            const left = this.handleCondition(condition.left, aliasMap, schemaAliasMap, tables);
-            const right = this.handleCondition(condition.right, aliasMap, schemaAliasMap, tables);
-            const template = SQL_TEMPLATES[condition.operator.toUpperCase()] || `{left} ${condition.operator} {right}`;
+            const left = this.handleCondition(condition.left, aliasMap, schemaAliasMap, tables, lang);
+            const right = this.handleCondition(condition.right, aliasMap, schemaAliasMap, tables, lang);
+            const template = T[condition.operator.toUpperCase()] || `{left} ${condition.operator} {right}`;
             return template.replace('{left}', left).replace('{right}', right);
         }
 
@@ -366,9 +379,9 @@ export class TemplateTaskDescriptionGenerationEngine {
                 const templateKey = funcName === 'EXISTS' ? 'EXISTS' : 'NOT_EXISTS';
                 const subAst = condition.args?.value?.[0]?.ast;
                 const subDesc = subAst
-                    ? this.traverseAST(subAst as AST, '', schemaAliasMap, tables)
+                    ? this.traverseAST(subAst as AST, '', schemaAliasMap, tables, lang)
                     : 'an unspecified condition';
-                return SQL_TEMPLATES[templateKey].replace('{condition}', subDesc);
+                return T[templateKey].replace('{condition}', subDesc);
             }
         }
 
@@ -376,15 +389,15 @@ export class TemplateTaskDescriptionGenerationEngine {
             // IS NULL / IS NOT NULL
             if (['IS', 'IS NOT'].includes(condition.operator)) {
                 if (condition.right?.type === 'null') {
-                    const operatorTemplate = SQL_TEMPLATES[`${condition.operator} NULL`];
-                    const left = this.getColumnName(condition.left, aliasMap, schemaAliasMap);
+                    const operatorTemplate = T[`${condition.operator} NULL`];
+                    const left = this.getColumnName(condition.left, aliasMap, schemaAliasMap, lang);
                     return operatorTemplate.replace('{left}', left);
                 }
             }
 
-            const operatorTemplate = SQL_TEMPLATES[condition.operator] || `{left} ${condition.operator} {right}`;
-            const left = this.getColumnName(condition.left, aliasMap, schemaAliasMap);
-            let right = condition.right?.value ?? this.getColumnName(condition.right, aliasMap, schemaAliasMap);
+            const operatorTemplate = T[condition.operator] || `{left} ${condition.operator} {right}`;
+            const left = this.getColumnName(condition.left, aliasMap, schemaAliasMap, lang);
+            let right = condition.right?.value ?? this.getColumnName(condition.right, aliasMap, schemaAliasMap, lang);
 
             if (condition.operator === 'BETWEEN' && Array.isArray(condition.right?.value)) {
                 right = `${condition.right.value[0].value} and ${condition.right.value[1].value}`;
@@ -413,8 +426,10 @@ export class TemplateTaskDescriptionGenerationEngine {
     private getColumnName(
         column: any,
         aliasMap: Record<string, string> = {},
-        schemaAliasMap?: IAliasMap
+        schemaAliasMap?: IAliasMap,
+        lang: SupportedLanguage = 'en'
     ): string {
+        const T = getTemplates(lang);
         if (!column) return 'unknown column';
 
         // ── Aggregate function ───────────────────────────────────────────────
@@ -422,7 +437,7 @@ export class TemplateTaskDescriptionGenerationEngine {
             const func = column.name?.toUpperCase();
             const arg = column.args?.expr;
             if (func && arg) {
-                const aggTemplate = SQL_TEMPLATES[func] ?? func.toLowerCase();
+                const aggTemplate = T[func] ?? func.toLowerCase();
                 const col = typeof arg.column === 'string' ? arg.column : arg.column?.expr?.value;
                 return aggTemplate.replace('{column}', this.formatName(col || 'unknown column', func));
             }
@@ -430,12 +445,12 @@ export class TemplateTaskDescriptionGenerationEngine {
 
         // ── Non-aggregate scalar function (e.g. COALESCE, UPPER, NOW) ───────
         if (column.type === 'function') {
-            return this.handleScalarFunction(column, aliasMap, schemaAliasMap);
+            return this.handleScalarFunction(column, aliasMap, schemaAliasMap, lang);
         }
 
         // ── CASE expression ──────────────────────────────────────────────────
         if (column.type === 'case') {
-            return this.handleCaseExpression(column, aliasMap, schemaAliasMap);
+            return this.handleCaseExpression(column, aliasMap, schemaAliasMap, lang);
         }
 
         // ── Plain column reference ───────────────────────────────────────────
@@ -483,7 +498,8 @@ export class TemplateTaskDescriptionGenerationEngine {
     private handleScalarFunction(
         column: any,
         aliasMap: Record<string, string>,
-        schemaAliasMap?: IAliasMap
+        schemaAliasMap?: IAliasMap,
+        lang: SupportedLanguage = 'en'
     ): string {
         // node-sql-parser stores function name as: { name: [{ type, value }] }
         const funcName: string = (
@@ -494,7 +510,7 @@ export class TemplateTaskDescriptionGenerationEngine {
         const rawArgs: any[] = column.args?.value ?? (Array.isArray(column.args) ? column.args : []);
 
         const resolvedArgs = rawArgs
-            .map((a: any) => this.getColumnName(a, aliasMap, schemaAliasMap));
+            .map((a: any) => this.getColumnName(a, aliasMap, schemaAliasMap, lang));
 
         switch (funcName) {
             case 'COALESCE':
@@ -546,24 +562,26 @@ export class TemplateTaskDescriptionGenerationEngine {
     private handleCaseExpression(
         column: any,
         aliasMap: Record<string, string>,
-        schemaAliasMap?: IAliasMap
+        schemaAliasMap?: IAliasMap,
+        lang: SupportedLanguage = 'en'
     ): string {
+        const T = getTemplates(lang);
         const args: any[] = column.args ?? [];
         const clauses: string[] = [];
 
         for (const arg of args) {
             if (arg.type === 'when') {
-                const cond = this.handleCondition(arg.cond ?? arg.condition, aliasMap, schemaAliasMap);
-                const result = this.getColumnName(arg.result ?? arg.then, aliasMap, schemaAliasMap);
+                const cond = this.handleCondition(arg.cond ?? arg.condition, aliasMap, schemaAliasMap, undefined, lang);
+                const result = this.getColumnName(arg.result ?? arg.then, aliasMap, schemaAliasMap, lang);
                 clauses.push(`when ${cond} then ${result}`);
             } else if (arg.type === 'else') {
-                const result = this.getColumnName(arg.result ?? arg.value, aliasMap, schemaAliasMap);
+                const result = this.getColumnName(arg.result ?? arg.value, aliasMap, schemaAliasMap, lang);
                 clauses.push(`otherwise ${result}`);
             }
         }
 
         const conditions = clauses.length > 0 ? clauses.join(', ') : 'various conditions';
-        return SQL_TEMPLATES.CASE.replace('{conditions}', conditions);
+        return T.CASE.replace('{conditions}', conditions);
     }
 
     // -------------------------------------------------------------------------
@@ -663,15 +681,16 @@ export class TemplateTaskDescriptionGenerationEngine {
         }).toLowerCase();
     }
 
-    private getJoinTemplate(joinType: string): string {
+    private getJoinTemplate(joinType: string, lang: SupportedLanguage = 'en'): string {
+        const T = getTemplates(lang);
         switch (joinType) {
-            case 'INNER JOIN': return SQL_TEMPLATES.INNER_JOIN;
-            case 'JOIN':       return SQL_TEMPLATES.INNER_JOIN;
-            case 'LEFT JOIN':  return SQL_TEMPLATES.LEFT_JOIN;
-            case 'RIGHT JOIN': return SQL_TEMPLATES.RIGHT_JOIN;
-            case 'FULL JOIN':  return SQL_TEMPLATES.FULL_JOIN;
-            case 'SELF JOIN':  return SQL_TEMPLATES.SELF_JOIN;
-            case 'CROSS JOIN': return SQL_TEMPLATES.CROSS_JOIN;
+            case 'INNER JOIN': return T.INNER_JOIN;
+            case 'JOIN':       return T.INNER_JOIN;
+            case 'LEFT JOIN':  return T.LEFT_JOIN;
+            case 'RIGHT JOIN': return T.RIGHT_JOIN;
+            case 'FULL JOIN':  return T.FULL_JOIN;
+            case 'SELF JOIN':  return T.SELF_JOIN;
+            case 'CROSS JOIN': return T.CROSS_JOIN;
             default:           return 'Perform an unspecified join.';
         }
     }

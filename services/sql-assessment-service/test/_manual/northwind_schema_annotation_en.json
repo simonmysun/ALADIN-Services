@@ -1,0 +1,140 @@
+{
+    "tables": {
+        "categories": "Product Categories",
+        "customer_customer_demo": "Customer Demographic Assignments",
+        "customer_demographics": "Customer Demographics",
+        "customers": "Customers",
+        "employees": "Employees",
+        "employee_territories": "Employee Territories",
+        "order_details": "Order Line Items",
+        "orders": "Orders",
+        "products": "Products",
+        "region": "Regions",
+        "shippers": "Shipping Companies",
+        "suppliers": "Suppliers",
+        "territories": "Sales Territories",
+        "us_states": "US States"
+    },
+    "columns": {
+        "categories": {
+            "category_id": "Category ID",
+            "category_name": "Category Name",
+            "description": "Category Description",
+            "picture": "Category Image"
+        },
+        "customer_customer_demo": {
+            "customer_id": "Customer ID",
+            "customer_type_id": "Customer Type ID"
+        },
+        "customer_demographics": {
+            "customer_type_id": "Customer Type ID",
+            "customer_desc": "Demographic Description"
+        },
+        "customers": {
+            "customer_id": "Customer ID",
+            "company_name": "Company Name",
+            "contact_name": "Primary Contact Name",
+            "contact_title": "Contact Job Title",
+            "address": "Street Address",
+            "city": "City",
+            "region": "State / Region",
+            "postal_code": "Postal Code",
+            "country": "Country",
+            "phone": "Phone Number",
+            "fax": "Fax Number"
+        },
+        "employees": {
+            "employee_id": "Employee ID",
+            "last_name": "Last Name",
+            "first_name": "First Name",
+            "title": "Job Title",
+            "title_of_courtesy": "Courtesy Title",
+            "birth_date": "Date of Birth",
+            "hire_date": "Hire Date",
+            "address": "Street Address",
+            "city": "City",
+            "region": "State / Region",
+            "postal_code": "Postal Code",
+            "country": "Country",
+            "home_phone": "Home Phone",
+            "extension": "Phone Extension",
+            "photo": "Employee Photo",
+            "notes": "Notes",
+            "reports_to": "Reports to",
+            "photo_path": "Photo File Path"
+        },
+        "employee_territories": {
+            "employee_id": "Employee ID",
+            "territory_id": "Territory ID"
+        },
+        "order_details": {
+            "order_id": "Order ID",
+            "product_id": "Product ID",
+            "unit_price": "Unit Price",
+            "quantity": "Quantity Ordered",
+            "discount": "Discount Percentage"
+        },
+        "orders": {
+            "order_id": "Order ID",
+            "customer_id": "Customer ID",
+            "employee_id": "Sales Representative ID",
+            "order_date": "Order Date",
+            "required_date": "Required Delivery Date",
+            "shipped_date": "Shipping Date",
+            "ship_via": "Shipped Via (Shipper ID)",
+            "freight": "Shipping Cost",
+            "ship_name": "Shipping Recipient Name",
+            "ship_address": "Shipping Address",
+            "ship_city": "Shipping City",
+            "ship_region": "Shipping State / Region",
+            "ship_postal_code": "Shipping Postal Code",
+            "ship_country": "Shipping Country"
+        },
+        "products": {
+            "product_id": "Product ID",
+            "product_name": "Product Name",
+            "supplier_id": "Supplier ID",
+            "category_id": "Category ID",
+            "quantity_per_unit": "Quantity Per Unit",
+            "unit_price": "Unit Price",
+            "units_in_stock": "Units In Stock",
+            "units_on_order": "Units On Order",
+            "reorder_level": "Reorder Threshold",
+            "discontinued": "Discontinued Flag"
+        },
+        "region": {
+            "region_id": "Region ID",
+            "region_description": "Region Description"
+        },
+        "shippers": {
+            "shipper_id": "Shipper ID",
+            "company_name": "Company Name",
+            "phone": "Phone Number"
+        },
+        "suppliers": {
+            "supplier_id": "Supplier ID",
+            "company_name": "Company Name",
+            "contact_name": "Primary Contact Name",
+            "contact_title": "Contact Job Title",
+            "address": "Street Address",
+            "city": "City",
+            "region": "State / Region",
+            "postal_code": "Postal Code",
+            "country": "Country",
+            "phone": "Phone Number",
+            "fax": "Fax Number",
+            "homepage": "Website"
+        },
+        "territories": {
+            "territory_id": "Territory ID",
+            "territory_description": "Territory Description",
+            "region_id": "Region ID"
+        },
+        "us_states": {
+            "state_id": "State ID",
+            "state_name": "State Name",
+            "state_abbr": "State Abbreviation",
+            "state_region": "Census Region"
+        }
+    }
+}

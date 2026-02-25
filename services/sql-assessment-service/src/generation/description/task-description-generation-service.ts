@@ -2,6 +2,7 @@ import { AST } from 'node-sql-parser';
 import { GenerationOptions, GptOptions, IAliasMap, IParsedTable } from '../../shared/interfaces/domain';
 import { LLMTaskDescriptionGenerationEngine } from './llm-task-description-generation-engine';
 import { TemplateTaskDescriptionGenerationEngine } from './template-task-description-generation-engine';
+import { SupportedLanguage } from '../../shared/i18n';
 
 export class TaskDescriptionGenerationService {
 
@@ -25,12 +26,13 @@ export class TaskDescriptionGenerationService {
         isSelfJoin?: boolean,
         option?: GptOptions,
         schemaAliasMap?: IAliasMap,
-        tables?: IParsedTable[]
+        tables?: IParsedTable[],
+        lang: SupportedLanguage = 'en'
     ): Promise<string> {
         switch (generationType) {
             case 'template':
                 return this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(
-                    queryAST, schema, schemaAliasMap, tables
+                    queryAST, schema, schemaAliasMap, tables, lang
                 );
 
             case 'llm':
@@ -38,15 +40,15 @@ export class TaskDescriptionGenerationService {
                     throw Error('Undefined GPT configuration');
                 }
                 return await this.llmTaskDescriptionGenerationEngine.generateTaskFromQuery(
-                    query, databaseKey, option, isSelfJoin
+                    query, databaseKey, option, isSelfJoin, lang
                 );
 
             case 'hybrid': {
                 const templateDescription = this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(
-                    queryAST, schema, schemaAliasMap, tables
+                    queryAST, schema, schemaAliasMap, tables, lang
                 );
                 return await this.llmTaskDescriptionGenerationEngine.generateNLGTaskFromTemplateTask(
-                    query, templateDescription, databaseKey
+                    query, templateDescription, databaseKey, isSelfJoin, lang
                 );
             }
 
