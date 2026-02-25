@@ -1,5 +1,5 @@
 import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
-import { ITaskConfiguration } from './domain';
+import { GenerationOptions, GptOptions, ITaskConfiguration } from './domain';
 
 export interface GradingRequest {
 	referenceQuery: string;
@@ -18,6 +18,17 @@ export interface IRequestGradingOptions {
 	gradingRequest: GradingRequest;
 	/** BCP 47 language code for error messages (e.g. "en", "de"). Defaults to "en". */
 	languageCode?: string;
+	/**
+	 * Which task-description generation strategy to use when the student query
+	 * is not equivalent to the reference query.  Defaults to the previous
+	 * behaviour (Hybrid when the query type is supported, LLM otherwise).
+	 */
+	generationStrategy?: GenerationOptions;
+	/**
+	 * GPT option forwarded to the LLM engine when generationStrategy is
+	 * GenerationOptions.LLM.  Defaults to GptOptions.Default.
+	 */
+	gptOption?: GptOptions;
 }
 
 export interface TaskResponse {
@@ -82,6 +93,17 @@ export interface IRequestComparisonOptions {
 	studentQuery: string;
 	/** BCP 47 language code for error messages (e.g. "en", "de"). Defaults to "en". */
 	languageCode?: string;
+	/**
+	 * Which task-description generation strategy to use.
+	 * Only relevant for endpoints that generate a student task description
+	 * (currently /grade).  Defaults to the previous behaviour.
+	 */
+	generationStrategy?: GenerationOptions;
+	/**
+	 * GPT option forwarded to the LLM engine when generationStrategy is
+	 * GenerationOptions.LLM.  Defaults to GptOptions.Default.
+	 */
+	gptOption?: GptOptions;
 }
 
 /** Response from POST /api/grading/compare/result-set */

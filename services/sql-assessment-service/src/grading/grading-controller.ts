@@ -6,6 +6,7 @@ import { connectToDatabase, generateDatabaseKey } from '../shared/utils/database
 import { isDatabaseRegistered, validateConnectionInfo } from '../shared/utils/validation';
 import { SQLQueryGradingService } from './query-grading-service';
 import {
+    ComparisonResult,
     GenerationOptions,
     GptOptions,
     IRequestGradingOptions,
@@ -135,7 +136,7 @@ export class GradingController {
     }
 
     // =========================================================================
-    // POST /api/grading/grade  (existing endpoint — unchanged contract)
+    // POST /api/grading/grade
     // =========================================================================
 
     async gradeQuery(req: Request, res: Response): Promise<Response> {
@@ -180,40 +181,21 @@ export class GradingController {
         const gradingRequest = gradingRequestOptions.gradingRequest;
         if (isConnected) {
             try {
-                let comparisonResult = await this.queryGradingService.gradeQuery(
+                const comparisonResult = await this.queryGradingService.gradeQuery(
                     gradingRequest.referenceQuery,
                     gradingRequest.studentQuery,
                     dataSource,
                     databaseKey
                 );
-                let studentTaskDescription: string | undefined;
 
-                if (!comparisonResult.equivalent && comparisonResult.supportedQueryType && process.env.OPENAI_API_KEY) {
-                    const parser = new Parser();
-                    const studentAST = parser.astify(gradingRequest.studentQuery, { database: 'postgresql' });
-                    studentTaskDescription = await this.taskDescriptionGenerationService.generateTaskFromQuery(
-                        GenerationOptions.Hybrid,
-                        gradingRequest.studentQuery,
-                        studentAST as AST,
-                        connectionInfo.schema!,
-                        databaseKey
-                    );
-                } else if (!comparisonResult.equivalent && process.env.OPENAI_API_KEY) {
-                    studentTaskDescription = await this.taskDescriptionGenerationService.generateTaskFromQuery(
-                        GenerationOptions.LLM,
-                        gradingRequest.studentQuery,
-                        {} as AST,
-                        connectionInfo.schema!,
-                        databaseKey,
-                        undefined,
-                        GptOptions.Default
-                    );
-                }
-
-                if (studentTaskDescription) {
-                    comparisonResult.feedback.push('\n Your query solves the task with the following description:');
-                    comparisonResult.feedback.push(studentTaskDescription);
-                }
+                await this.appendTaskDescription(
+                    comparisonResult,
+                    gradingRequest.studentQuery,
+                    connectionInfo.schema!,
+                    databaseKey,
+                    gradingRequestOptions.generationStrategy,
+                    gradingRequestOptions.gptOption
+                );
 
                 await dataSource.destroy();
                 return res.status(200).json({ comparisonResult });
@@ -224,6 +206,94 @@ export class GradingController {
             }
         }
         return res.status(500).json({ message: t('GRADING_FAILED', lang) });
+    }
+
+    // =========================================================================
+    // Task-description generation helper
+    // =========================================================================
+
+    /**
+     * Generates a natural-language description of the student's query and
+     * appends it to `comparisonResult.feedback` when applicable.
+     *
+     * The concrete generation strategy is selected via `strategy`:
+     *
+     * | strategy              | behaviour                                                      |
+     * |-----------------------|----------------------------------------------------------------|
+     * | `undefined` (default) | Hybrid when the query type is supported, LLM otherwise         |
+     * | `Template`            | AST-based template engine only (no LLM required)               |
+     * | `LLM`                 | Pure LLM call; uses `gptOption` (defaults to `GptOptions.Default`) |
+     * | `Hybrid`              | Template engine → LLM NLG post-processing                      |
+     *
+     * The method is a no-op when:
+     * - the student query is already equivalent to the reference query, or
+     * - `OPENAI_API_KEY` is absent and the chosen strategy requires an LLM.
+     */
+    private async appendTaskDescription(
+        comparisonResult: ComparisonResult,
+        studentQuery:     string,
+        schema:           string,
+        databaseKey:      string,
+        strategy?:        GenerationOptions,
+        gptOption?:       GptOptions
+    ): Promise<void> {
+        if (comparisonResult.equivalent) return;
+
+        const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+        const resolvedGptOption = gptOption ?? GptOptions.Default;
+
+        let studentTaskDescription: string | undefined;
+
+        if (strategy !== undefined) {
+            // Explicit strategy chosen by the caller
+            const needsLLM = strategy === GenerationOptions.LLM || strategy === GenerationOptions.Hybrid;
+            if (needsLLM && !hasOpenAI) return;
+
+            const parser   = new Parser();
+            const studentAST = (strategy !== GenerationOptions.LLM)
+                ? parser.astify(studentQuery, { database: 'postgresql' }) as AST
+                : {} as AST;
+
+            studentTaskDescription = await this.taskDescriptionGenerationService.generateTaskFromQuery(
+                strategy,
+                studentQuery,
+                studentAST,
+                schema,
+                databaseKey,
+                undefined,
+                resolvedGptOption
+            );
+        } else {
+            // Legacy default behaviour: Hybrid for supported types, LLM otherwise
+            if (!hasOpenAI) return;
+
+            if (comparisonResult.supportedQueryType) {
+                const parser     = new Parser();
+                const studentAST = parser.astify(studentQuery, { database: 'postgresql' }) as AST;
+                studentTaskDescription = await this.taskDescriptionGenerationService.generateTaskFromQuery(
+                    GenerationOptions.Hybrid,
+                    studentQuery,
+                    studentAST,
+                    schema,
+                    databaseKey
+                );
+            } else {
+                studentTaskDescription = await this.taskDescriptionGenerationService.generateTaskFromQuery(
+                    GenerationOptions.LLM,
+                    studentQuery,
+                    {} as AST,
+                    schema,
+                    databaseKey,
+                    undefined,
+                    GptOptions.Default
+                );
+            }
+        }
+
+        if (studentTaskDescription) {
+            comparisonResult.feedback.push('\n Your query solves the task with the following description:');
+            comparisonResult.feedback.push(studentTaskDescription);
+        }
     }
 
     // =========================================================================
