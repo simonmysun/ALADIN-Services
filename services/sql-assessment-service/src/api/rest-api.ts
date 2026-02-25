@@ -4,6 +4,7 @@ import path from 'path';
 import { DatabaseController } from '../database/database-controller';
 import { TaskGenerationController } from '../generation/task-generation-controller';
 import { GradingController } from '../grading/grading-controller';
+import { DescriptionController } from '../generation/description/description-controller';
 
 const api = express();
 
@@ -16,11 +17,13 @@ api.get('/', (req, res) => {
 export function registerControllers(
     databaseController: DatabaseController,
     taskGenerationController: TaskGenerationController,
-    gradingController: GradingController
+    gradingController: GradingController,
+    descriptionController: DescriptionController
 ) {
     api.use('/api/database', databaseController.router);
     api.use('/api/generation', taskGenerationController.router);
     api.use('/api/grading', gradingController.router);
+    api.use('/api/description', descriptionController.router);
 }
 
 export function startRestApi() {

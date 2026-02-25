@@ -25,13 +25,17 @@ export class TemplateTaskDescriptionGenerationEngine {
         let result = '';
         const isSelectAll = node.columns.length === 1 && node.columns[0].expr?.column === '*';
 
+        // Build an alias→table map so that column references using aliases
+        // (e.g. e1.first_name in a self-join) resolve to the real table name.
+        const aliasMap = this.buildAliasMap(Array.isArray(node.from) ? node.from : []);
+
         if (Array.isArray(node.from)) {
             if ((node.from as Join[]).some(fromItem => fromItem?.join)) {
                 let baseTable = this.formatName((node.from[0] as BaseFrom)?.table || 'an unknown table');
 
                 const columns = isSelectAll
                     ? '*'
-                    : node.columns.map((col: any) => this.getColumnName(col.expr)).join(' and ');
+                    : node.columns.map((col: any) => this.getColumnName(col.expr, aliasMap)).join(' and ');
 
                 result += isSelectAll
                     ? SQL_TEMPLATES.SELECT_ALL_JOIN.replace('{database}', schema)
@@ -54,7 +58,7 @@ export class TemplateTaskDescriptionGenerationEngine {
                             .replace('{table1}', baseTable)
                             .replace('{table}', baseTable)
                             .replace('{table2}', this.formatName(join.table) || 'another_table')
-                            .replace('{condition}', this.handleJoinCondition(condition));
+                            .replace('{condition}', this.handleJoinCondition(condition, aliasMap));
                         baseTable = this.formatName(join.table);
                     }
                 });
@@ -64,7 +68,7 @@ export class TemplateTaskDescriptionGenerationEngine {
 
                 const columns = isSelectAll
                     ? '*'
-                    : node.columns.map((col: any) => this.getColumnName(col.expr)).join(' and ');
+                    : node.columns.map((col: any) => this.getColumnName(col.expr, aliasMap)).join(' and ');
 
                 result += isSelectAll
                     ? SQL_TEMPLATES.SELECT_ALL.replace('{table}', this.formatName(table)).replace('{database}', schema)
@@ -79,25 +83,25 @@ export class TemplateTaskDescriptionGenerationEngine {
         }
 
         if (node.where) {
-            const condition = this.handleCondition(node.where);
+            const condition = this.handleCondition(node.where, aliasMap);
             result += ' ' + SQL_TEMPLATES.WHERE.replace('{condition}', condition);
         }
 
         if (node.groupby && node.groupby.columns && node.groupby.columns.length > 0) {
             const groupByColumns = node.groupby.columns
-                ? node.groupby.columns.map((col: any) => this.getColumnName(col)).join(', ')
+                ? node.groupby.columns.map((col: any) => this.getColumnName(col, aliasMap)).join(', ')
                 : '';
             result += ' ' + SQL_TEMPLATES.GROUP_BY.replace('{columns}', groupByColumns);
         }
 
         if (node.having) {
-            const havingCondition = this.handleCondition(node.having);
+            const havingCondition = this.handleCondition(node.having, aliasMap);
             result += ' ' + SQL_TEMPLATES.HAVING.replace('{condition}', havingCondition);
         }
 
         if (node.orderby) {
             const orderByColumns = node.orderby.map((col: any) => {
-                const columnName = this.getColumnName(col.expr);
+                const columnName = this.getColumnName(col.expr, aliasMap);
                 const orderType = col.type?.toUpperCase() === 'DESC' ? 'descending' : 'ascending';
                 return `${columnName} in ${orderType} order`;
             }).join(', ');
@@ -108,7 +112,17 @@ export class TemplateTaskDescriptionGenerationEngine {
         return result;
     }
 
-    private handleJoinCondition(on: string | any): string {
+    private buildAliasMap(from: any[]): Record<string, string> {
+        const map: Record<string, string> = {};
+        for (const entry of from) {
+            if (entry.as && entry.table) {
+                map[entry.as] = entry.table;
+            }
+        }
+        return map;
+    }
+
+    private handleJoinCondition(on: string | any, aliasMap: Record<string, string> = {}): string {
         let left, operator, right;
         if (typeof on === 'string') {
             [left, operator, right] = this.parseConditionString(on);
@@ -121,20 +135,20 @@ export class TemplateTaskDescriptionGenerationEngine {
             return 'an unspecified condition';
         }
         const operatorTemplate = SQL_TEMPLATES[operator] || `{left} ${operator} {right}`;
-        const formattedLeft = this.getColumnName(left);
-        let formattedRight = right?.value || this.getColumnName(right);
+        const formattedLeft = this.getColumnName(left, aliasMap);
+        let formattedRight = right?.value || this.getColumnName(right, aliasMap);
 
         return operatorTemplate
             .replace('{left}', formattedLeft)
             .replace('{right}', formattedRight);
     }
 
-    private handleCondition(condition: any): string {
+    private handleCondition(condition: any, aliasMap: Record<string, string> = {}): string {
         if (!condition) return 'an unspecified condition';
 
         if (condition.operator && (condition.operator === 'AND' || condition.operator === 'OR')) {
-            const left = this.handleCondition(condition.left);
-            const right = this.handleCondition(condition.right);
+            const left = this.handleCondition(condition.left, aliasMap);
+            const right = this.handleCondition(condition.right, aliasMap);
             const operatorTemplate = SQL_TEMPLATES[condition.operator.toUpperCase()] || `{left} ${condition.operator} {right}`;
             return operatorTemplate.replace('{left}', left).replace('{right}', right);
         }
@@ -143,14 +157,14 @@ export class TemplateTaskDescriptionGenerationEngine {
             if (['IS', 'IS NOT'].includes(condition.operator)) {
                 if (condition.right.type == 'null') {
                     const operatorTemplate = SQL_TEMPLATES[`${condition.operator} NULL`];
-                    const left = this.getColumnName(condition.left);
+                    const left = this.getColumnName(condition.left, aliasMap);
                     return operatorTemplate.replace('{left}', left);
                 }
             }
 
             const operatorTemplate = SQL_TEMPLATES[condition.operator] || `{left} ${condition.operator} {right}`;
-            const left = this.getColumnName(condition.left);
-            let right = condition.right?.value || this.getColumnName(condition.right);
+            const left = this.getColumnName(condition.left, aliasMap);
+            let right = condition.right?.value || this.getColumnName(condition.right, aliasMap);
 
             if (condition.operator === 'BETWEEN' && Array.isArray(condition.right.value)) {
                 right = `${condition.right.value[0].value} and ${condition.right.value[1].value}`;
@@ -199,7 +213,7 @@ export class TemplateTaskDescriptionGenerationEngine {
         return [leftColumn, operator, rightColumn];
     }
 
-    private getColumnName(column: any): string {
+    private getColumnName(column: any, aliasMap: Record<string, string> = {}): string {
         if (!column) return 'unknown column';
 
         if (column.type === 'aggr_func') {
@@ -214,13 +228,18 @@ export class TemplateTaskDescriptionGenerationEngine {
         }
 
         if (column.column) {
+            // Resolve alias to real table name if present in the alias map.
+            const resolvedTable = column.table
+                ? (aliasMap[column.table] ?? column.table)
+                : null;
+
             if (typeof column.column === 'string') {
-                let tablePart = column.table ? `the ${this.formatName(column.table)} ` : '';
+                let tablePart = resolvedTable ? `the ${this.formatName(resolvedTable)} ` : '';
                 let columnPart = this.formatName(column.column);
                 return `${tablePart}${columnPart}`;
             }
             else if (column.column.expr) {
-                let tablePart = column.table ? `the ${this.formatName(column.table)} ` : '';
+                let tablePart = resolvedTable ? `the ${this.formatName(resolvedTable)} ` : '';
                 let columnPart = this.formatName(column.column.expr.value);
                 return `${tablePart}${columnPart}`;
             }

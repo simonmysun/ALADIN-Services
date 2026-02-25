@@ -37,7 +37,7 @@ export const SQL_TEMPLATES: { [key: string]: string } = {
     "IS NOT": "{left} is not {right}",
 
     "WHERE": "Filter the results where {condition}.",
-    "GROUP_BY": "Group the results based on the {columns}.",
+    "GROUP_BY": "Group the results based on {columns}.",
     "HAVING": "Filter the grouped results where {condition}.",
-    "ORDER_BY": "Sort the results by the {columns}.",
+    "ORDER_BY": "Sort the results by {columns}.",
 };

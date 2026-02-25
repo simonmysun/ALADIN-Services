@@ -9,6 +9,7 @@ import { TemplateTaskDescriptionGenerationEngine } from './generation/descriptio
 import { LLMTaskDescriptionGenerationEngine } from './generation/description/llm-task-description-generation-engine';
 import { TaskDescriptionGenerationService } from './generation/description/task-description-generation-service';
 import { TaskGenerationController } from './generation/task-generation-controller';
+import { DescriptionController } from './generation/description/description-controller';
 import { registerControllers, startRestApi } from './api/rest-api';
 
 const databaseAnalyzer = new DatabaseAnalyzer();
@@ -24,6 +25,7 @@ const taskDescriptionGenerationService = new TaskDescriptionGenerationService(
 const taskGenerationController = new TaskGenerationController(selectQueryGenerator, taskDescriptionGenerationService);
 const queryGradingService = new SQLQueryGradingService();
 const gradingController = new GradingController(queryGradingService, taskDescriptionGenerationService);
+const descriptionController = new DescriptionController(taskDescriptionGenerationService);
 
-registerControllers(connectionController, taskGenerationController, gradingController);
+registerControllers(connectionController, taskGenerationController, gradingController, descriptionController);
 startRestApi();
