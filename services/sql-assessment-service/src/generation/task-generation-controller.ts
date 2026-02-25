@@ -6,6 +6,7 @@ import { connectToDatabase, generateDatabaseKey } from '../shared/utils/database
 import { isDatabaseRegistered, validateConnectionInfo } from '../shared/utils/validation';
 import { SQLQueryGenerationService } from './query/sql-query-generation-service';
 import { TaskDescriptionGenerationService } from './description/task-description-generation-service';
+import { t, resolveLanguageCode } from '../shared/i18n';
 
 export class TaskGenerationController {
     public router: Router;
@@ -36,24 +37,26 @@ export class TaskGenerationController {
             taskRequest = req.body;
         } catch (err: any) {
             console.log('Error in reading request', err);
-            return res.status(400).json({ message: 'Invalid request information' });
+            return res.status(400).json({ message: t('TASK_GENERATION_INVALID_REQUEST', 'en') });
         }
+
+        const lang = resolveLanguageCode(taskRequest!?.languageCode);
 
         try {
             connectionInfo = taskRequest.connectionInfo;
         } catch (err: any) {
             console.log('Error in reading connection info', err);
-            return res.status(400).json({ message: 'Invalid connection information' });
+            return res.status(400).json({ message: t('TASK_GENERATION_INVALID_CONNECTION', lang) });
         }
 
-        const validationError = validateConnectionInfo(connectionInfo);
+        const validationError = validateConnectionInfo(connectionInfo, lang);
         if (validationError) {
             return res.status(400).json({ message: validationError });
         }
 
         const databaseKey = generateDatabaseKey(connectionInfo.host!, connectionInfo.port!, connectionInfo.schema!);
         if (!isDatabaseRegistered(databaseKey)) {
-            return res.status(400).json({ message: 'Unregistered database, please trigger database analysis.' });
+            return res.status(400).json({ message: t('DATABASE_NOT_REGISTERED', lang) });
         }
 
         console.log('Received connection info:', connectionInfo);
@@ -81,7 +84,7 @@ export class TaskGenerationController {
             } catch (error) {
                 console.log(error);
                 dataSource.destroy();
-                return res.status(500).json({ message: `Error in query generation, please try again. ${error}` });
+                return res.status(500).json({ message: t('TASK_GENERATION_QUERY_ERROR', lang, String(error)) });
             }
 
             let taskDescription: string | undefined;
@@ -109,7 +112,7 @@ export class TaskGenerationController {
                 );
             } catch (error) {
                 console.log('Error in task description generation', error);
-                return res.status(500).json({ message: 'Error in task description generation, please try again.' });
+                return res.status(500).json({ message: t('TASK_GENERATION_DESCRIPTION_ERROR', lang) });
             }
 
             const taskResponse: TaskResponse = {
@@ -124,6 +127,6 @@ export class TaskGenerationController {
             return res.status(200).json(taskResponse);
         }
 
-        return res.status(400).json({ message: 'Unable to connect to database' });
+        return res.status(400).json({ message: t('UNABLE_TO_CONNECT', lang) });
     }
 }

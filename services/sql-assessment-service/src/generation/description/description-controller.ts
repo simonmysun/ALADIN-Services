@@ -5,6 +5,7 @@ import { DescriptionResponse, IRequestDescriptionOptions } from '../../shared/in
 import { generateDatabaseKey } from '../../shared/utils/database-utils';
 import { isDatabaseRegistered, validateConnectionInfo } from '../../shared/utils/validation';
 import { TaskDescriptionGenerationService } from './task-description-generation-service';
+import { t, resolveLanguageCode, SupportedLanguage } from '../../shared/i18n';
 
 const sqlParser = new Parser();
 
@@ -57,27 +58,29 @@ export class DescriptionController {
     private validateRequest(
         req: Request,
         res: Response
-    ): { options: IRequestDescriptionOptions; databaseKey: string } | null {
+    ): { options: IRequestDescriptionOptions; databaseKey: string; lang: SupportedLanguage } | null {
         let options: IRequestDescriptionOptions;
 
         try {
             options = req.body as IRequestDescriptionOptions;
         } catch (err) {
-            res.status(400).json({ message: 'Invalid request body' });
+            res.status(400).json({ message: t('INVALID_REQUEST_BODY', 'en') });
             return null;
         }
 
+        const lang = resolveLanguageCode(options?.languageCode);
+
         if (!options?.connectionInfo) {
-            res.status(400).json({ message: 'Missing connectionInfo' });
+            res.status(400).json({ message: t('MISSING_CONNECTION_INFO', lang) });
             return null;
         }
 
         if (!options.query || typeof options.query !== 'string' || options.query.trim() === '') {
-            res.status(400).json({ message: 'Missing or empty query string' });
+            res.status(400).json({ message: t('DESCRIPTION_MISSING_QUERY', lang) });
             return null;
         }
 
-        const connectionError = validateConnectionInfo(options.connectionInfo);
+        const connectionError = validateConnectionInfo(options.connectionInfo, lang);
         if (connectionError) {
             res.status(400).json({ message: connectionError });
             return null;
@@ -87,11 +90,11 @@ export class DescriptionController {
         const databaseKey = generateDatabaseKey(host!, port!, schema!);
 
         if (!isDatabaseRegistered(databaseKey)) {
-            res.status(400).json({ message: 'Unregistered database, please trigger database analysis.' });
+            res.status(400).json({ message: t('DATABASE_NOT_REGISTERED', lang) });
             return null;
         }
 
-        return { options, databaseKey };
+        return { options, databaseKey, lang };
     }
 
     // ---------------------------------------------------------------------------
@@ -102,7 +105,7 @@ export class DescriptionController {
         const validated = this.validateRequest(req, res);
         if (!validated) return res;
 
-        const { options, databaseKey } = validated;
+        const { options, databaseKey, lang } = validated;
         // TODO: pass languageCode to TemplateTaskDescriptionGenerationEngine when i18n is supported
         const languageCode = options.languageCode ?? 'en';
 
@@ -110,7 +113,7 @@ export class DescriptionController {
         try {
             ast = sqlParser.astify(options.query);
         } catch (err) {
-            return res.status(400).json({ message: `Failed to parse SQL query: ${err}` });
+            return res.status(400).json({ message: t('DESCRIPTION_PARSE_FAILED', lang, String(err)) });
         }
 
         try {
@@ -127,7 +130,7 @@ export class DescriptionController {
             return res.status(200).json(response);
         } catch (err) {
             console.error('Error in template description generation', err);
-            return res.status(500).json({ message: `Error in template description generation: ${err}` });
+            return res.status(500).json({ message: t('DESCRIPTION_TEMPLATE_FAILED', lang, String(err)) });
         }
     }
 
@@ -139,7 +142,7 @@ export class DescriptionController {
         const validated = this.validateRequest(req, res);
         if (!validated) return res;
 
-        const { options, databaseKey } = validated;
+        const { options, databaseKey, lang } = validated;
         // TODO: pass languageCode to LLMTaskDescriptionGenerationEngine when i18n is supported
         const languageCode = options.languageCode ?? 'en';
 
@@ -158,7 +161,7 @@ export class DescriptionController {
             return res.status(200).json(response);
         } catch (err) {
             console.error('Error in LLM default description generation', err);
-            return res.status(500).json({ message: `Error in LLM default description generation: ${err}` });
+            return res.status(500).json({ message: t('DESCRIPTION_LLM_DEFAULT_FAILED', lang, String(err)) });
         }
     }
 
@@ -170,7 +173,7 @@ export class DescriptionController {
         const validated = this.validateRequest(req, res);
         if (!validated) return res;
 
-        const { options, databaseKey } = validated;
+        const { options, databaseKey, lang } = validated;
         // TODO: pass languageCode to LLMTaskDescriptionGenerationEngine when i18n is supported
         const languageCode = options.languageCode ?? 'en';
 
@@ -189,7 +192,7 @@ export class DescriptionController {
             return res.status(200).json(response);
         } catch (err) {
             console.error('Error in LLM creative description generation', err);
-            return res.status(500).json({ message: `Error in LLM creative description generation: ${err}` });
+            return res.status(500).json({ message: t('DESCRIPTION_LLM_CREATIVE_FAILED', lang, String(err)) });
         }
     }
 
@@ -201,7 +204,7 @@ export class DescriptionController {
         const validated = this.validateRequest(req, res);
         if (!validated) return res;
 
-        const { options, databaseKey } = validated;
+        const { options, databaseKey, lang } = validated;
         // TODO: pass languageCode to LLMTaskDescriptionGenerationEngine when i18n is supported
         const languageCode = options.languageCode ?? 'en';
 
@@ -220,7 +223,7 @@ export class DescriptionController {
             return res.status(200).json(response);
         } catch (err) {
             console.error('Error in LLM multi-step description generation', err);
-            return res.status(500).json({ message: `Error in LLM multi-step description generation: ${err}` });
+            return res.status(500).json({ message: t('DESCRIPTION_LLM_MULTISTEP_FAILED', lang, String(err)) });
         }
     }
 
@@ -232,7 +235,7 @@ export class DescriptionController {
         const validated = this.validateRequest(req, res);
         if (!validated) return res;
 
-        const { options, databaseKey } = validated;
+        const { options, databaseKey, lang } = validated;
         // TODO: pass languageCode to both engines when i18n is supported
         const languageCode = options.languageCode ?? 'en';
 
@@ -240,7 +243,7 @@ export class DescriptionController {
         try {
             ast = sqlParser.astify(options.query);
         } catch (err) {
-            return res.status(400).json({ message: `Failed to parse SQL query: ${err}` });
+            return res.status(400).json({ message: t('DESCRIPTION_PARSE_FAILED', lang, String(err)) });
         }
 
         try {
@@ -257,7 +260,7 @@ export class DescriptionController {
             return res.status(200).json(response);
         } catch (err) {
             console.error('Error in hybrid description generation', err);
-            return res.status(500).json({ message: `Error in hybrid description generation: ${err}` });
+            return res.status(500).json({ message: t('DESCRIPTION_HYBRID_FAILED', lang, String(err)) });
         }
     }
 }

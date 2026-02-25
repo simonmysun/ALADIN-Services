@@ -5,6 +5,7 @@ import { DatabaseController } from '../database/database-controller';
 import { TaskGenerationController } from '../generation/task-generation-controller';
 import { GradingController } from '../grading/grading-controller';
 import { DescriptionController } from '../generation/description/description-controller';
+import { QueryExecutionController } from '../query/query-execution-controller';
 
 const api = express();
 
@@ -18,12 +19,14 @@ export function registerControllers(
     databaseController: DatabaseController,
     taskGenerationController: TaskGenerationController,
     gradingController: GradingController,
-    descriptionController: DescriptionController
+    descriptionController: DescriptionController,
+    queryExecutionController: QueryExecutionController
 ) {
     api.use('/api/database', databaseController.router);
     api.use('/api/generation', taskGenerationController.router);
     api.use('/api/grading', gradingController.router);
     api.use('/api/description', descriptionController.router);
+    api.use('/api/query', queryExecutionController.router);
 }
 
 export function startRestApi() {

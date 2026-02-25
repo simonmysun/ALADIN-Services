@@ -4,6 +4,7 @@ import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConne
 import { DatabaseAnalyzer } from './database-analyzer';
 import { connectToDatabase, generateDatabaseKey } from '../shared/utils/database-utils';
 import { validateConnectionInfo } from '../shared/utils/validation';
+import { t, resolveLanguageCode } from '../shared/i18n';
 
 export class DatabaseController {
     public router: Router;
@@ -26,14 +27,16 @@ export class DatabaseController {
         let dataSource: DataSource;
         let isConnected: boolean;
 
+        const lang = resolveLanguageCode(req.body?.languageCode);
+
         try {
             connectionInfo = req.body.connectionInfo;
         } catch (err: any) {
             console.log('Invalid connection info', err);
-            return res.status(400).json({ message: 'Invalid connection information', error: err });
+            return res.status(400).json({ message: t('INVALID_CONNECTION_INFO', lang) });
         }
 
-        const validationError = validateConnectionInfo(connectionInfo);
+        const validationError = validateConnectionInfo(connectionInfo, lang);
         if (validationError) {
             return res.status(400).json({ message: validationError });
         }
@@ -43,7 +46,7 @@ export class DatabaseController {
             dataSource = new DataSource(connectionInfo);
             isConnected = await connectToDatabase(dataSource);
         } catch (error) {
-            return res.status(400).json({ message: 'Unable to connect to database' });
+            return res.status(400).json({ message: t('UNABLE_TO_CONNECT', lang) });
         }
 
         if (isConnected) {
@@ -55,10 +58,10 @@ export class DatabaseController {
                 )
             ) {
                 await dataSource.destroy();
-                return res.status(200).json({ message: 'Connection successful' });
+                return res.status(200).json({ message: t('DATABASE_ANALYSIS_SUCCESS', lang) });
             }
             await dataSource.destroy();
-            return res.status(500).json({ message: 'Unable to extract database schema' });
+            return res.status(500).json({ message: t('DATABASE_SCHEMA_EXTRACTION_FAILED', lang) });
         }
 
         try {
@@ -66,6 +69,6 @@ export class DatabaseController {
         } catch (error) {
             console.log(error);
         }
-        return res.status(400).json({ message: 'Unable to connect to database' });
+        return res.status(400).json({ message: t('UNABLE_TO_CONNECT', lang) });
     }
 }

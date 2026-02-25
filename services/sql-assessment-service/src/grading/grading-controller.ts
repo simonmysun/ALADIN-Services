@@ -7,6 +7,7 @@ import { isDatabaseRegistered, validateConnectionInfo } from '../shared/utils/va
 import { SQLQueryGradingService } from './query-grading-service';
 import { GenerationOptions, GptOptions, IRequestGradingOptions } from '../shared/interfaces/index';
 import { TaskDescriptionGenerationService } from '../generation/description/task-description-generation-service';
+import { t, resolveLanguageCode } from '../shared/i18n';
 
 export class GradingController {
     public router: Router;
@@ -37,24 +38,26 @@ export class GradingController {
             gradingRequestOptions = req.body;
         } catch (err: any) {
             console.log('Error in reading grading request', err);
-            return res.status(400).json({ message: 'Error in reading task configuration' });
+            return res.status(400).json({ message: t('GRADING_READ_ERROR', 'en') });
         }
+
+        const lang = resolveLanguageCode(gradingRequestOptions!?.languageCode);
 
         try {
             connectionInfo = gradingRequestOptions.connectionInfo;
         } catch (err: any) {
             console.log('Error in reading connection info', err);
-            return res.status(400).json({ message: 'Error in connection info' });
+            return res.status(400).json({ message: t('GRADING_CONNECTION_READ_ERROR', lang) });
         }
 
-        const validationError = validateConnectionInfo(connectionInfo);
+        const validationError = validateConnectionInfo(connectionInfo, lang);
         if (validationError) {
             return res.status(400).json({ message: validationError });
         }
 
         const databaseKey = generateDatabaseKey(connectionInfo.host!, connectionInfo.port!, connectionInfo.schema!);
         if (!isDatabaseRegistered(databaseKey)) {
-            return res.status(400).json({ message: 'Unregistered database, please trigger database analysis.' });
+            return res.status(400).json({ message: t('DATABASE_NOT_REGISTERED', lang) });
         }
 
         let dataSource: DataSource;
@@ -63,7 +66,7 @@ export class GradingController {
             dataSource = new DataSource(connectionInfo);
             isConnected = await connectToDatabase(dataSource);
         } catch (error) {
-            return res.status(400).json({ message: 'Unable to connect to database' });
+            return res.status(400).json({ message: t('UNABLE_TO_CONNECT', lang) });
         }
 
         const gradingRequest = gradingRequestOptions.gradingRequest;
@@ -109,9 +112,9 @@ export class GradingController {
             } catch (error) {
                 console.log(error);
                 await dataSource.destroy();
-                return res.status(500).json({ message: `Unable to grade query. Error: ${error}` });
+                return res.status(500).json({ message: t('GRADING_FAILED_WITH_ERROR', lang, String(error)) });
             }
         }
-        return res.status(500).json({ message: 'Unable to grade query.' });
+        return res.status(500).json({ message: t('GRADING_FAILED', lang) });
     }
 }

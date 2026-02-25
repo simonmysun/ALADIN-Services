@@ -30,7 +30,7 @@
  *   afterAll(async () => dataSource.destroy());
  */
 
-import { newDb, IMemoryDb, IBackup } from 'pg-mem';
+import { newDb, IMemoryDb, IBackup, DataType } from 'pg-mem';
 import { DataSource } from 'typeorm';
 
 export interface TestDb {
@@ -224,6 +224,19 @@ export async function createTestDb(): Promise<TestDb> {
             implementation: () => crypto.randomUUID(),
             impure: true,
         });
+    });
+
+    // TypeORM calls current_database() and version() during DataSource.initialize().
+    // pg-mem does not implement these by default — register stubs so the adapter works.
+    db.public.registerFunction({
+        name: 'current_database',
+        returns: DataType.text,
+        implementation: () => 'pg_mem',
+    });
+    db.public.registerFunction({
+        name: 'version',
+        returns: DataType.text,
+        implementation: () => 'PostgreSQL 14.0 (pg-mem)',
     });
 
     // Apply schema and seed data directly on the pg-mem public schema object.

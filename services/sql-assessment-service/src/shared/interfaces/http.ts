@@ -9,11 +9,15 @@ export interface GradingRequest {
 export interface IRequestTaskOptions {
 	connectionInfo: PostgresConnectionOptions;
 	taskConfiguration: ITaskConfiguration;
+	/** BCP 47 language code for error messages (e.g. "en", "de"). Defaults to "en". */
+	languageCode?: string;
 }
 
 export interface IRequestGradingOptions {
 	connectionInfo: PostgresConnectionOptions;
 	gradingRequest: GradingRequest;
+	/** BCP 47 language code for error messages (e.g. "en", "de"). Defaults to "en". */
+	languageCode?: string;
 }
 
 export interface TaskResponse {
@@ -51,4 +55,19 @@ export interface DescriptionResponse {
 	description: string;
 	/** The language code that was requested (echoes the input, defaults to "en"). */
 	languageCode: string;
+}
+
+export interface IRequestQueryOptions {
+	connectionInfo: PostgresConnectionOptions;
+	/** Raw SQL SELECT query to execute against the registered database. */
+	query: string;
+	/** BCP 47 language code for error messages (e.g. "en", "de"). Defaults to "en". */
+	languageCode?: string;
+}
+
+export interface QueryExecutionResult {
+	/** Rows returned by the query. Each row is a plain key→value object. */
+	rows: Record<string, unknown>[];
+	/** Number of rows returned. */
+	rowCount: number;
 }
