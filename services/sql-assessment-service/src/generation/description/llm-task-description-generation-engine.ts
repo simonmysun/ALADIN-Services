@@ -67,6 +67,23 @@ export class LLMTaskDescriptionGenerationEngine {
         }
     }
 
+    /**
+     * Serialises an IParsedTable array for use in LLM prompts, substituting
+     * alternativeName for name wherever an alias has been provided.
+     */
+    private serializeSchemaForPrompt(tables: IParsedTable[]): string {
+        const aliased = tables.map(table => ({
+            ...table,
+            name: table.alternativeName ?? table.name,
+            columns: table.columns.map(col => ({
+                ...col,
+                name: col.alternativeName ?? col.name,
+                tableName: table.alternativeName ?? col.tableName,
+            })),
+        }));
+        return JSON.stringify(aliased);
+    }
+
     private resolveMetadata(databaseKey: string, isSelfJoin?: boolean): IParsedTable[] {
         if (isSelfJoin) {
             const tables = selfJoinDatabaseMetadata.get(databaseKey);
@@ -91,9 +108,11 @@ export class LLMTaskDescriptionGenerationEngine {
         const tables = this.resolveMetadata(databaseKey, isSelfJoin);
         let queryParts = this.splitSQLQuery(query);
 
+        const schemaString = this.serializeSchemaForPrompt(tables);
+
         const sequence = RunnableSequence.from([
             new RunnableLambda({
-                func: async (input: { tables: IParsedTable[] }) => {
+                func: async (input: { tables: string }) => {
                     const entityPrompt = SystemMessagePromptTemplate.fromTemplate([
                         new SystemMessage(`You are a database expert.`),
                         new SystemMessage(`Given the following database schema: {tables}.`),
@@ -157,7 +176,7 @@ export class LLMTaskDescriptionGenerationEngine {
         ]);
 
         try {
-            const response = await sequence.invoke({ tables });
+            const response = await sequence.invoke({ tables: schemaString });
             console.log('Generated Task Description:', response);
             return response as string;
         } catch (error) {
@@ -177,7 +196,7 @@ export class LLMTaskDescriptionGenerationEngine {
             `${this.instructions} As additional information you can find the parsed tables that describe the schema of the database.`,
         );
         const querySystemMessage = new SystemMessage(`This is the query: ${query}`);
-        const schemaSystemMessage = new SystemMessage(`This is the schema: ${tables}`);
+        const schemaSystemMessage = new SystemMessage(`This is the schema: ${this.serializeSchemaForPrompt(tables)}`);
         const messages = [systemMessage, querySystemMessage, schemaSystemMessage];
 
         try {
@@ -200,7 +219,7 @@ export class LLMTaskDescriptionGenerationEngine {
             `${this.instructions} As additional information you can find the parsed tables that describe the schema of the database.`,
         );
         const querySystemMessage = new SystemMessage(`This is the query: ${query}`);
-        const schemaSystemMessage = new SystemMessage(`This is the schema: ${tables}`);
+        const schemaSystemMessage = new SystemMessage(`This is the schema: ${this.serializeSchemaForPrompt(tables)}`);
         const messages = [systemMessage, querySystemMessage, schemaSystemMessage];
 
         try {
@@ -225,7 +244,7 @@ export class LLMTaskDescriptionGenerationEngine {
         );
 
         const querySystemMessage = new SystemMessage(`This is the query: ${query}`);
-        const schemaSystemMessage = new SystemMessage(`This is the schema: ${tables}`);
+        const schemaSystemMessage = new SystemMessage(`This is the schema: ${this.serializeSchemaForPrompt(tables)}`);
         const taskMessage = new SystemMessage(
             `This is the task description that you should improve: ${taskDescription}`,
         );

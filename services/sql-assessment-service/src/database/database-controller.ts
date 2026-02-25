@@ -5,6 +5,7 @@ import { DatabaseAnalyzer } from './database-analyzer';
 import { connectToDatabase, generateDatabaseKey } from '../shared/utils/database-utils';
 import { validateConnectionInfo } from '../shared/utils/validation';
 import { t, resolveLanguageCode } from '../shared/i18n';
+import { IAliasMap } from '../shared/interfaces/domain';
 
 export class DatabaseController {
     public router: Router;
@@ -49,12 +50,28 @@ export class DatabaseController {
             return res.status(400).json({ message: t('UNABLE_TO_CONNECT', lang) });
         }
 
+        // Parse and validate the optional alias map
+        let aliasMap: IAliasMap | undefined;
+        const rawAliasMap = req.body.aliasMap;
+        if (rawAliasMap !== undefined) {
+            if (
+                typeof rawAliasMap !== 'object' ||
+                Array.isArray(rawAliasMap) ||
+                rawAliasMap === null
+            ) {
+                console.log('Invalid aliasMap provided — must be a plain object. Ignoring.');
+            } else {
+                aliasMap = rawAliasMap as IAliasMap;
+            }
+        }
+
         if (isConnected) {
             if (
                 await this.databaseAnalyzer.extractDatabaseSchema(
                     dataSource,
                     connectionInfo.schema!,
-                    generateDatabaseKey(connectionInfo.host!, connectionInfo.port!, connectionInfo.schema!)
+                    generateDatabaseKey(connectionInfo.host!, connectionInfo.port!, connectionInfo.schema!),
+                    aliasMap
                 )
             ) {
                 await dataSource.destroy();

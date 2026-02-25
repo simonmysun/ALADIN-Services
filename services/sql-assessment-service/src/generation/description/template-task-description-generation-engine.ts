@@ -1,27 +1,28 @@
 import { AST, BaseFrom, Binary, ColumnRefItem, Join, Select } from 'node-sql-parser';
 import { SQL_TEMPLATES } from './sql-templates';
+import { IAliasMap } from '../../shared/interfaces/domain';
 
 export class TemplateTaskDescriptionGenerationEngine {
 
     private readonly columnPattern = /([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)/g;
     private readonly aggregateFunctionPattern = /(MAX|MIN|SUM|AVG|COUNT)\((.*?)\)/i;
 
-    public generateTaskFromQuery(query: AST, schema: string): string {
-        return this.traverseAST(query, schema);
+    public generateTaskFromQuery(query: AST, schema: string, schemaAliasMap?: IAliasMap): string {
+        return this.traverseAST(query, schema, schemaAliasMap);
     }
 
-    private traverseAST(node: AST, schema: string): string {
+    private traverseAST(node: AST, schema: string, schemaAliasMap?: IAliasMap): string {
         if (!node) return '';
 
         switch (node.type) {
             case 'select':
-                return this.handleSelect(node, schema);
+                return this.handleSelect(node, schema, schemaAliasMap);
             default:
                 return 'Unsupported query type.';
         }
     }
 
-    private handleSelect(node: Select, schema: string): string {
+    private handleSelect(node: Select, schema: string, schemaAliasMap?: IAliasMap): string {
         let result = '';
         const isSelectAll = node.columns.length === 1 && node.columns[0].expr?.column === '*';
 
@@ -31,11 +32,11 @@ export class TemplateTaskDescriptionGenerationEngine {
 
         if (Array.isArray(node.from)) {
             if ((node.from as Join[]).some(fromItem => fromItem?.join)) {
-                let baseTable = this.formatName((node.from[0] as BaseFrom)?.table || 'an unknown table');
+                let baseTable = this.formatTableName((node.from[0] as BaseFrom)?.table || 'an unknown table', schemaAliasMap);
 
                 const columns = isSelectAll
                     ? '*'
-                    : node.columns.map((col: any) => this.getColumnName(col.expr, aliasMap)).join(' and ');
+                    : node.columns.map((col: any) => this.getColumnName(col.expr, aliasMap, schemaAliasMap)).join(' and ');
 
                 result += isSelectAll
                     ? SQL_TEMPLATES.SELECT_ALL_JOIN.replace('{database}', schema)
@@ -46,7 +47,7 @@ export class TemplateTaskDescriptionGenerationEngine {
                         const joinType = join.join.toUpperCase();
                         let joinTemplate;
                         let useAlias = false;
-                        if (baseTable == this.formatName(join.table)) {
+                        if (baseTable == this.formatTableName(join.table, schemaAliasMap)) {
                             joinTemplate = SQL_TEMPLATES.SELF_JOIN;
                             useAlias = true;
                         }
@@ -57,9 +58,9 @@ export class TemplateTaskDescriptionGenerationEngine {
                         result += ' ' + joinTemplate
                             .replace('{table1}', baseTable)
                             .replace('{table}', baseTable)
-                            .replace('{table2}', this.formatName(join.table) || 'another_table')
-                            .replace('{condition}', this.handleJoinCondition(condition, aliasMap));
-                        baseTable = this.formatName(join.table);
+                            .replace('{table2}', this.formatTableName(join.table, schemaAliasMap) || 'another_table')
+                            .replace('{condition}', this.handleJoinCondition(condition, aliasMap, schemaAliasMap));
+                        baseTable = this.formatTableName(join.table, schemaAliasMap);
                     }
                 });
             }
@@ -68,11 +69,11 @@ export class TemplateTaskDescriptionGenerationEngine {
 
                 const columns = isSelectAll
                     ? '*'
-                    : node.columns.map((col: any) => this.getColumnName(col.expr, aliasMap)).join(' and ');
+                    : node.columns.map((col: any) => this.getColumnName(col.expr, aliasMap, schemaAliasMap)).join(' and ');
 
                 result += isSelectAll
-                    ? SQL_TEMPLATES.SELECT_ALL.replace('{table}', this.formatName(table)).replace('{database}', schema)
-                    : SQL_TEMPLATES.SELECT_COLUMNS.replace('{columns}', columns).replace('{table}', this.formatName(table)).replace('{database}', schema);
+                    ? SQL_TEMPLATES.SELECT_ALL.replace('{table}', this.formatTableName(table, schemaAliasMap)).replace('{database}', schema)
+                    : SQL_TEMPLATES.SELECT_COLUMNS.replace('{columns}', columns).replace('{table}', this.formatTableName(table, schemaAliasMap)).replace('{database}', schema);
             }
             else {
                 result += 'Unsupported FROM clause structure.';
@@ -83,25 +84,25 @@ export class TemplateTaskDescriptionGenerationEngine {
         }
 
         if (node.where) {
-            const condition = this.handleCondition(node.where, aliasMap);
+            const condition = this.handleCondition(node.where, aliasMap, schemaAliasMap);
             result += ' ' + SQL_TEMPLATES.WHERE.replace('{condition}', condition);
         }
 
         if (node.groupby && node.groupby.columns && node.groupby.columns.length > 0) {
             const groupByColumns = node.groupby.columns
-                ? node.groupby.columns.map((col: any) => this.getColumnName(col, aliasMap)).join(', ')
+                ? node.groupby.columns.map((col: any) => this.getColumnName(col, aliasMap, schemaAliasMap)).join(', ')
                 : '';
             result += ' ' + SQL_TEMPLATES.GROUP_BY.replace('{columns}', groupByColumns);
         }
 
         if (node.having) {
-            const havingCondition = this.handleCondition(node.having, aliasMap);
+            const havingCondition = this.handleCondition(node.having, aliasMap, schemaAliasMap);
             result += ' ' + SQL_TEMPLATES.HAVING.replace('{condition}', havingCondition);
         }
 
         if (node.orderby) {
             const orderByColumns = node.orderby.map((col: any) => {
-                const columnName = this.getColumnName(col.expr, aliasMap);
+                const columnName = this.getColumnName(col.expr, aliasMap, schemaAliasMap);
                 const orderType = col.type?.toUpperCase() === 'DESC' ? 'descending' : 'ascending';
                 return `${columnName} in ${orderType} order`;
             }).join(', ');
@@ -122,7 +123,11 @@ export class TemplateTaskDescriptionGenerationEngine {
         return map;
     }
 
-    private handleJoinCondition(on: string | any, aliasMap: Record<string, string> = {}): string {
+    private handleJoinCondition(
+        on: string | any,
+        aliasMap: Record<string, string> = {},
+        schemaAliasMap?: IAliasMap
+    ): string {
         let left, operator, right;
         if (typeof on === 'string') {
             [left, operator, right] = this.parseConditionString(on);
@@ -135,20 +140,24 @@ export class TemplateTaskDescriptionGenerationEngine {
             return 'an unspecified condition';
         }
         const operatorTemplate = SQL_TEMPLATES[operator] || `{left} ${operator} {right}`;
-        const formattedLeft = this.getColumnName(left, aliasMap);
-        let formattedRight = right?.value || this.getColumnName(right, aliasMap);
+        const formattedLeft = this.getColumnName(left, aliasMap, schemaAliasMap);
+        let formattedRight = right?.value || this.getColumnName(right, aliasMap, schemaAliasMap);
 
         return operatorTemplate
             .replace('{left}', formattedLeft)
             .replace('{right}', formattedRight);
     }
 
-    private handleCondition(condition: any, aliasMap: Record<string, string> = {}): string {
+    private handleCondition(
+        condition: any,
+        aliasMap: Record<string, string> = {},
+        schemaAliasMap?: IAliasMap
+    ): string {
         if (!condition) return 'an unspecified condition';
 
         if (condition.operator && (condition.operator === 'AND' || condition.operator === 'OR')) {
-            const left = this.handleCondition(condition.left, aliasMap);
-            const right = this.handleCondition(condition.right, aliasMap);
+            const left = this.handleCondition(condition.left, aliasMap, schemaAliasMap);
+            const right = this.handleCondition(condition.right, aliasMap, schemaAliasMap);
             const operatorTemplate = SQL_TEMPLATES[condition.operator.toUpperCase()] || `{left} ${condition.operator} {right}`;
             return operatorTemplate.replace('{left}', left).replace('{right}', right);
         }
@@ -157,14 +166,14 @@ export class TemplateTaskDescriptionGenerationEngine {
             if (['IS', 'IS NOT'].includes(condition.operator)) {
                 if (condition.right.type == 'null') {
                     const operatorTemplate = SQL_TEMPLATES[`${condition.operator} NULL`];
-                    const left = this.getColumnName(condition.left, aliasMap);
+                    const left = this.getColumnName(condition.left, aliasMap, schemaAliasMap);
                     return operatorTemplate.replace('{left}', left);
                 }
             }
 
             const operatorTemplate = SQL_TEMPLATES[condition.operator] || `{left} ${condition.operator} {right}`;
-            const left = this.getColumnName(condition.left, aliasMap);
-            let right = condition.right?.value || this.getColumnName(condition.right, aliasMap);
+            const left = this.getColumnName(condition.left, aliasMap, schemaAliasMap);
+            let right = condition.right?.value || this.getColumnName(condition.right, aliasMap, schemaAliasMap);
 
             if (condition.operator === 'BETWEEN' && Array.isArray(condition.right.value)) {
                 right = `${condition.right.value[0].value} and ${condition.right.value[1].value}`;
@@ -213,7 +222,11 @@ export class TemplateTaskDescriptionGenerationEngine {
         return [leftColumn, operator, rightColumn];
     }
 
-    private getColumnName(column: any, aliasMap: Record<string, string> = {}): string {
+    private getColumnName(
+        column: any,
+        aliasMap: Record<string, string> = {},
+        schemaAliasMap?: IAliasMap
+    ): string {
         if (!column) return 'unknown column';
 
         if (column.type === 'aggr_func') {
@@ -228,20 +241,26 @@ export class TemplateTaskDescriptionGenerationEngine {
         }
 
         if (column.column) {
-            // Resolve alias to real table name if present in the alias map.
+            // Resolve SQL alias to real table name if present in the alias map.
             const resolvedTable = column.table
                 ? (aliasMap[column.table] ?? column.table)
                 : null;
 
             if (typeof column.column === 'string') {
-                let tablePart = resolvedTable ? `the ${this.formatName(resolvedTable)} ` : '';
-                let columnPart = this.formatName(column.column);
-                return `${tablePart}${columnPart}`;
+                const displayTable = resolvedTable
+                    ? this.resolveTableDisplayName(resolvedTable, schemaAliasMap)
+                    : null;
+                const displayColumn = this.resolveColumnDisplayName(resolvedTable, column.column, schemaAliasMap);
+                let tablePart = displayTable ? `the ${displayTable} ` : '';
+                return `${tablePart}${displayColumn}`;
             }
             else if (column.column.expr) {
-                let tablePart = resolvedTable ? `the ${this.formatName(resolvedTable)} ` : '';
-                let columnPart = this.formatName(column.column.expr.value);
-                return `${tablePart}${columnPart}`;
+                const displayTable = resolvedTable
+                    ? this.resolveTableDisplayName(resolvedTable, schemaAliasMap)
+                    : null;
+                const displayColumn = this.resolveColumnDisplayName(resolvedTable, column.column.expr.value, schemaAliasMap);
+                let tablePart = displayTable ? `the ${displayTable} ` : '';
+                return `${tablePart}${displayColumn}`;
             }
         }
 
@@ -250,6 +269,38 @@ export class TemplateTaskDescriptionGenerationEngine {
         }
 
         return 'unavailable';
+    }
+
+    /**
+     * Returns the display name for a table, applying schemaAliasMap if available,
+     * then formatting the result.
+     */
+    private formatTableName(tableName: string, schemaAliasMap?: IAliasMap): string {
+        const alias = schemaAliasMap?.tables?.[tableName];
+        return this.formatName(alias ?? tableName);
+    }
+
+    /**
+     * Returns the display name for a column, applying schemaAliasMap if available,
+     * then formatting the result.
+     */
+    private resolveColumnDisplayName(
+        tableName: string | null,
+        columnName: string,
+        schemaAliasMap?: IAliasMap
+    ): string {
+        const alias = tableName
+            ? schemaAliasMap?.columns?.[tableName]?.[columnName]
+            : undefined;
+        return this.formatName(alias ?? columnName);
+    }
+
+    /**
+     * Returns the formatted display name for a table (alias-aware).
+     */
+    private resolveTableDisplayName(tableName: string, schemaAliasMap?: IAliasMap): string {
+        const alias = schemaAliasMap?.tables?.[tableName];
+        return this.formatName(alias ?? tableName);
     }
 
     private pluralize(name: string): string {

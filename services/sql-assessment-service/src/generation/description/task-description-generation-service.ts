@@ -1,5 +1,5 @@
 import { AST } from 'node-sql-parser';
-import { GenerationOptions, GptOptions } from '../../shared/interfaces/domain';
+import { GenerationOptions, GptOptions, IAliasMap } from '../../shared/interfaces/domain';
 import { LLMTaskDescriptionGenerationEngine } from './llm-task-description-generation-engine';
 import { TemplateTaskDescriptionGenerationEngine } from './template-task-description-generation-engine';
 
@@ -23,11 +23,12 @@ export class TaskDescriptionGenerationService {
         schema: string,
         databaseKey: string,
         isSelfJoin?: boolean,
-        option?: GptOptions
+        option?: GptOptions,
+        schemaAliasMap?: IAliasMap
     ): Promise<string> {
         switch (generationType) {
             case 'template':
-                return this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(queryAST, schema);
+                return this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(queryAST, schema, schemaAliasMap);
 
             case 'llm':
                 if (!option) {
@@ -36,7 +37,7 @@ export class TaskDescriptionGenerationService {
                 return await this.llmTaskDescriptionGenerationEngine.generateTaskFromQuery(query, databaseKey, option, isSelfJoin);
 
             case 'hybrid': {
-                const templateDescription = this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(queryAST, schema);
+                const templateDescription = this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(queryAST, schema, schemaAliasMap);
                 return await this.llmTaskDescriptionGenerationEngine.generateNLGTaskFromTemplateTask(query, templateDescription, databaseKey);
             }
 

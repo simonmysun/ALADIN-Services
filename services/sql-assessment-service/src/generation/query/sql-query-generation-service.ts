@@ -44,8 +44,8 @@ export class SQLQueryGenerationService {
                 );
 
                 return filteredPaths.length > 0
-                    ? { name: table.name, joinPaths: filteredPaths, columns: table.columns }
-                    : { name: table.name, joinPaths: [], columns: table.columns };
+                    ? { ...table, joinPaths: filteredPaths }
+                    : { ...table, joinPaths: [] };
             })
             .filter(table => table.joinPaths.length >= 1);
     }
