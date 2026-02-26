@@ -99,7 +99,7 @@ export class TaskGenerationController {
 				.json({ message: t('TASK_GENERATION_INVALID_REQUEST', 'en') });
 		}
 
-		const lang = resolveLanguageCode(taskRequest!?.languageCode);
+		const lang = resolveLanguageCode(taskRequest?.languageCode);
 
 		try {
 			connectionInfo = taskRequest.connectionInfo;

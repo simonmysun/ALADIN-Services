@@ -270,7 +270,7 @@ export class PredicateGenerationService {
         if (!column.aggregation)
             throw new Error('Error in selecting aggregation type for Having predicate');
 
-        let type = numericTypes.includes(column.type) ? 'number' : 'single_quote_string';
+        const type = numericTypes.includes(column.type) ? 'number' : 'single_quote_string';
         const operators = ['>', '>=', '<', '<=', '=', '!='];
         const operator = operators[random(operators.length)];
 
@@ -306,7 +306,7 @@ export class PredicateGenerationService {
         dataSource: DataSource,
         schema: string
     ): Promise<Expr | undefined> {
-        let type = numericTypes.includes(column.type) ? 'number' : 'single_quote_string';
+        const type = numericTypes.includes(column.type) ? 'number' : 'single_quote_string';
         switch (operation) {
             case 'EQUAL':
                 return this.generateEqualityConstraint(column, type, dataSource, schema);
@@ -391,13 +391,13 @@ export class PredicateGenerationService {
         query: string,
         isHaving = false
     ): Promise<any> {
-        let queryRunner = createQueryRunner(dataSource);
+        const queryRunner = createQueryRunner(dataSource);
         if (!queryRunner) return undefined;
         const randomValue = await queryRunner.query(query);
         queryRunner.release();
 
         if (randomValue && randomValue.length > 0) {
-            let value = randomValue[0][`${columnName}`];
+            const value = randomValue[0][`${columnName}`];
 
             if (!isHaving && value && dateTypes.includes(columnType)) {
                 const date = new Date(value);
@@ -414,15 +414,15 @@ export class PredicateGenerationService {
         dataSource: DataSource,
         query: string
     ): Promise<any[] | undefined> {
-        let queryRunner = createQueryRunner(dataSource);
+        const queryRunner = createQueryRunner(dataSource);
         if (!queryRunner) return undefined;
         const randomValue = await queryRunner.query(query);
         queryRunner.release();
 
         if (randomValue && randomValue.length > 0) {
-            let formattedValues = [];
+            const formattedValues = [];
             for (let i = 0; i < randomValue.length; i++) {
-                let value = randomValue[i][`${column.name}`];
+                const value = randomValue[i][`${column.name}`];
 
                 if (value && dateTypes.includes(column.type)) {
                     const date = new Date(value);

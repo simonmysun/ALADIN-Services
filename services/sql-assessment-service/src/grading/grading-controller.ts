@@ -365,7 +365,7 @@ export class GradingController {
 			return res.status(400).json({ message: t('GRADING_READ_ERROR', 'en') });
 		}
 
-		const lang = resolveLanguageCode(gradingRequestOptions!?.languageCode);
+		const lang = resolveLanguageCode(gradingRequestOptions?.languageCode);
 
 		try {
 			connectionInfo = gradingRequestOptions.connectionInfo;
@@ -621,6 +621,7 @@ export class GradingController {
 			studentAST = parser.astify(studentQuery, { database: 'postgresql' });
 			referenceAST = parser.astify(referenceQuery, { database: 'postgresql' });
 		} catch (error) {
+			console.error(error);
 			return res.status(400).json({ message: t('GRADING_READ_ERROR', lang) });
 		}
 
@@ -678,6 +679,7 @@ export class GradingController {
 			studentAST = parser.astify(studentQuery, { database: 'postgresql' });
 			referenceAST = parser.astify(referenceQuery, { database: 'postgresql' });
 		} catch (error) {
+			console.error(error);
 			await dataSource.destroy();
 			return res.status(400).json({ message: t('GRADING_READ_ERROR', lang) });
 		}

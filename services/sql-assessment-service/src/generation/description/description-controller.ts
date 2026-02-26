@@ -266,6 +266,7 @@ export class DescriptionController {
 		try {
 			options = req.body as IRequestDescriptionOptions;
 		} catch (err) {
+			console.error(err);
 			res.status(400).json({ message: t('INVALID_REQUEST_BODY', 'en') });
 			return null;
 		}

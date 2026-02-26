@@ -78,22 +78,22 @@ export class SQLQueryGradingService {
 			lang,
 		);
 
-		// Build a base feedbackDetails that may be extended below
-		const buildWithGeneral = (
-			generalEntry: AssembledFeedback['general'],
-			extra?: Partial<AssembledFeedback>,
-		): AssembledFeedback => {
-			const fd: AssembledFeedback = {};
-			if (rsFeedback.length > 0) {
-				fd.general = {
-					...generalEntry,
-					executability: rsFeedback[0] ? { message: rsFeedback[0] } : undefined,
-				};
-			} else if (generalEntry) {
-				fd.general = generalEntry;
-			}
-			return { ...fd, ...extra };
-		};
+		// // Build a base feedbackDetails that may be extended below
+		// const buildWithGeneral = (
+		// 	generalEntry: AssembledFeedback['general'],
+		// 	extra?: Partial<AssembledFeedback>,
+		// ): AssembledFeedback => {
+		// 	const fd: AssembledFeedback = {};
+		// 	if (rsFeedback.length > 0) {
+		// 		fd.general = {
+		// 			...generalEntry,
+		// 			executability: rsFeedback[0] ? { message: rsFeedback[0] } : undefined,
+		// 		};
+		// 	} else if (generalEntry) {
+		// 		fd.general = generalEntry;
+		// 	}
+		// 	return { ...fd, ...extra };
+		// };
 
 		// ── 3. AST parsing & validation ──────────────────────────────────────
 

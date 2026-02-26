@@ -146,7 +146,7 @@ export class LLMTaskDescriptionGenerationEngine {
 		lang: SupportedLanguage = 'en',
 	): Promise<string> {
 		const tables = this.resolveMetadata(databaseKey, isSelfJoin);
-		let queryParts = this.splitSQLQuery(query);
+		const queryParts = this.splitSQLQuery(query);
 
 		const schemaString = this.serializeSchemaForPrompt(tables);
 		const langDirective =
@@ -224,7 +224,7 @@ export class LLMTaskDescriptionGenerationEngine {
 			return response as string;
 		} catch (error) {
 			console.error(error);
-			throw new Error('Error in generating task description using GPT.');
+			throw new Error(`Error in generating task description using GPT.`);
 		}
 	}
 

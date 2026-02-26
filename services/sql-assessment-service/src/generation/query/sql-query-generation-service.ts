@@ -21,7 +21,7 @@ export class SQLQueryGenerationService {
         datasource: DataSource,
         schema: string
     ): Promise<[string, AST]> {
-        let metadata = context.joinTypes.includes('SELF JOIN')
+        const metadata = context.joinTypes.includes('SELF JOIN')
             ? this.getSelfJoinMetadata(databasekey)
             : this.getMetadata(databasekey);
 
