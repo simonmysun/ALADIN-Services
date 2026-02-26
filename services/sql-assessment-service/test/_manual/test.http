@@ -102,10 +102,11 @@ content-type: application/json
     },
 	"gradingRequest": {
 		"taskId": "4f7c66ed-e4e5-422e-8d6f-ef4ee3876d02",
-		"studentQuery": "SELECT PROJEKT.\"PNAME\", ANG_PRO.\"ANGNR\", ANGEST.\"NAME\" FROM PROJEKT LEFT JOIN ANG_PRO ON PROJEKT.\"PNR\" = ANG_PRO.\"PNR\" LEFT OUTER JOIN ANGEST ON ANG_PRO.\"ANGNR\" = ANGEST.\"ANGNR\";",
+		"studentQuery": "SELECT kunde.WOHNORT, COUNT(kunde.KDNR) FROM test.kunde GROUP BY kunde.WOHNORT HAVING COUNT(kunde.KDNR) > 1",
         "referenceQuery": "SELECT * FROM PROJEKT"
 	},
-	"languageCode": "de"
+	"languageCode": "de",
+	"generationStrategy": "template"
 }
 
 ###

@@ -311,9 +311,11 @@ export class GradingController {
 	 * | `LLM`                 | Pure LLM call; uses `gptOption` (defaults to `GptOptions.Default`) |
 	 * | `Hybrid`              | Template engine → LLM NLG post-processing                      |
 	 *
-	 * The method is a no-op when:
-	 * - the student query is already equivalent to the reference query, or
-	 * - `OPENAI_API_KEY` is absent and the chosen strategy requires an LLM.
+	 * When `OPENAI_API_KEY` is absent the service automatically falls back to the
+	 * Template engine so a description is always produced.
+	 *
+	 * The method is a no-op when the student query is already equivalent to the
+	 * reference query.
 	 */
 	private async appendTaskDescription(
 		comparisonResult: ComparisonResult,
@@ -326,18 +328,12 @@ export class GradingController {
 	): Promise<void> {
 		if (comparisonResult.equivalent) return;
 
-		const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
 		const resolvedGptOption = gptOption ?? GptOptions.Default;
 
 		let studentTaskDescription: string | undefined;
 
 		if (strategy !== undefined) {
 			// Explicit strategy chosen by the caller
-			const needsLLM =
-				strategy === GenerationOptions.LLM ||
-				strategy === GenerationOptions.Hybrid;
-			if (needsLLM && !hasOpenAI) return;
-
 			const parser = new Parser();
 			const studentAST =
 				strategy !== GenerationOptions.LLM
@@ -346,7 +342,7 @@ export class GradingController {
 
 			studentTaskDescription =
 				await this.taskDescriptionGenerationService.generateTaskFromQuery({
-					generationType: GenerationOptions.LLM,
+					generationType: strategy,
 					query: studentQuery,
 					queryAST: studentAST,
 					schema: schema,
@@ -356,9 +352,8 @@ export class GradingController {
 					lang,
 				});
 		} else {
-			// Legacy default behaviour: Hybrid for supported types, LLM otherwise
-			if (!hasOpenAI) return;
-
+			// Default behaviour: Hybrid for supported types, LLM otherwise.
+			// When OPENAI_API_KEY is absent the service falls back to Template.
 			if (comparisonResult.supportedQueryType) {
 				const parser = new Parser();
 				const studentAST = parser.astify(studentQuery, {

@@ -26,7 +26,9 @@ const connectionController = new DatabaseController(databaseAnalyzer);
 
 const selectQueryGenerator = new SQLQueryGenerationService(new SelectQueryGenerationDirector());
 const templateTaskDescriptionGenerationEngine = new TemplateTaskDescriptionGenerationEngine();
-const llmTaskDescriptionGenerationEngine = new LLMTaskDescriptionGenerationEngine();
+const llmTaskDescriptionGenerationEngine = process.env.OPENAI_API_KEY
+    ? new LLMTaskDescriptionGenerationEngine()
+    : undefined;
 const taskDescriptionGenerationService = new TaskDescriptionGenerationService(
     llmTaskDescriptionGenerationEngine,
     templateTaskDescriptionGenerationEngine

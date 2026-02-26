@@ -11,10 +11,10 @@ import { SupportedLanguage } from '../../shared/i18n';
 
 export class TaskDescriptionGenerationService {
 	templateTaskDescriptionGenerationEngine: TemplateTaskDescriptionGenerationEngine;
-	llmTaskDescriptionGenerationEngine: LLMTaskDescriptionGenerationEngine;
+	llmTaskDescriptionGenerationEngine: LLMTaskDescriptionGenerationEngine | undefined;
 
 	constructor(
-		llmTaskDescriptionGenerationEngine: LLMTaskDescriptionGenerationEngine,
+		llmTaskDescriptionGenerationEngine: LLMTaskDescriptionGenerationEngine | undefined,
 		templateTaskDescriptionGenerationEngine: TemplateTaskDescriptionGenerationEngine,
 	) {
 		this.templateTaskDescriptionGenerationEngine =
@@ -61,6 +61,11 @@ export class TaskDescriptionGenerationService {
 				);
 
 			case 'llm':
+				if (!this.llmTaskDescriptionGenerationEngine) {
+					return this.templateTaskDescriptionGenerationEngine.generateTaskFromQuery(
+						{ query: queryAST, schema, schemaAliasMap, tables, lang },
+					);
+				}
 				if (!option) {
 					throw Error('Undefined GPT configuration');
 				}
@@ -83,6 +88,9 @@ export class TaskDescriptionGenerationService {
 						tables,
 						lang,
 					});
+				if (!this.llmTaskDescriptionGenerationEngine) {
+					return templateDescription;
+				}
 				return await this.llmTaskDescriptionGenerationEngine.generateNLGTaskFromTemplateTask(
 					query,
 					templateDescription,

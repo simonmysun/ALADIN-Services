@@ -2,7 +2,6 @@
  * Global test setup executed once before the test suite starts.
  *
  * Responsibilities:
- *  - Stub environment variables so tests never call real external services.
  *  - Export a shared pg-mem factory so individual test files can spin up an
  *    in-memory Postgres instance without boilerplate.
  *
@@ -12,15 +11,13 @@
  *
  * This setup file is loaded by Vitest via the `setupFiles` option in
  * vitest.config.ts.
+ *
+ * Note: OPENAI_API_KEY is intentionally not stubbed here. The application
+ * treats it as optional and falls back to the TemplateTaskDescriptionGenerationEngine
+ * when it is absent, so no stub is needed for the test environment.
  */
 
-import { beforeAll, afterAll } from 'vitest';
-
-beforeAll(() => {
-    // Prevent any production code that reads OPENAI_API_KEY from hitting the
-    // real OpenAI API during tests.
-    process.env.OPENAI_API_KEY = 'test-key';
-});
+import { afterAll } from 'vitest';
 
 afterAll(() => {
     // Teardown global resources here if needed.
