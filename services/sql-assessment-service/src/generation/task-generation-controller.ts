@@ -20,6 +20,48 @@ import { SQLQueryGenerationService } from './query/sql-query-generation-service'
 import { TaskDescriptionGenerationService } from './description/task-description-generation-service';
 import { t, resolveLanguageCode } from '../shared/i18n';
 
+/**
+ * @openapi
+ * /api/generation/generate:
+ *   get:
+ *     summary: Generate a random SQL task
+ *     description: >
+ *       Generates a random SQL SELECT query based on the supplied task
+ *       configuration (join depth, aggregation, predicates, etc.) and produces
+ *       up to five natural-language descriptions of the task using different
+ *       generation strategies (template, LLM entity-relationship, LLM
+ *       schema-based, LLM creative, hybrid). The database must have been
+ *       previously registered via POST /api/database/analyze-database.
+ *     tags:
+ *       - Generation
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/GenerateTaskRequest'
+ *     responses:
+ *       '200':
+ *         description: Task generated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TaskResponse'
+ *       '400':
+ *         description: >
+ *           Invalid connection info, unregistered database, or invalid task
+ *           configuration.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: Query or description generation failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 export class TaskGenerationController {
 	public router: Router;
 	selectQueryGenerationService: SQLQueryGenerationService;

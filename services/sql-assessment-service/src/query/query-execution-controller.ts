@@ -25,6 +25,46 @@ import { t, resolveLanguageCode } from '../shared/i18n';
  * All error messages are localised according to the optional `languageCode`
  * field in the request body (default: "en").
  */
+/**
+ * @openapi
+ * /api/query/execute:
+ *   post:
+ *     summary: Execute a raw SQL SELECT query
+ *     description: >
+ *       Executes a raw SQL SELECT statement against a pre-registered database.
+ *       Only SELECT statements are permitted; all other statement types are
+ *       rejected with a 400 error. The database must have been previously
+ *       registered via POST /api/database/analyze-database.
+ *     tags:
+ *       - Query
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/QueryExecuteRequest'
+ *     responses:
+ *       '200':
+ *         description: Query executed successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/QueryExecutionResult'
+ *       '400':
+ *         description: >
+ *           Invalid request body, unregistered database, non-SELECT statement,
+ *           or connection failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: Database-level execution failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 export class QueryExecutionController {
     public router: Router;
     private readonly queryExecutionService: QueryExecutionService;

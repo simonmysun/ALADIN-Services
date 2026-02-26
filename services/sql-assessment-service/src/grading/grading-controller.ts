@@ -45,6 +45,153 @@ interface ValidatedConnection {
 // ---------------------------------------------------------------------------
 
 /**
+ * @openapi
+ * /api/grading/grade:
+ *   post:
+ *     summary: Full orchestrated grading of a student SQL query
+ *     description: >
+ *       Executes both the reference and student queries, compares their result
+ *       sets, AST structure, and execution plans, calculates a grade, and
+ *       optionally generates a natural-language description of the student
+ *       query. Accepts either a single `referenceQuery` (deprecated) or a
+ *       `referenceQueries` array; when multiple references are supplied the
+ *       structurally closest one is selected automatically.
+ *     tags:
+ *       - Grading
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/GradeRequest'
+ *     responses:
+ *       '200':
+ *         description: Grading completed successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GradeResponse'
+ *       '400':
+ *         description: Invalid request, unregistered database, or connection failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: Grading pipeline failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *
+ * /api/grading/compare/result-set:
+ *   post:
+ *     summary: Compare result sets of two SQL queries
+ *     description: >
+ *       Executes both the reference and student queries against the registered
+ *       database and compares their returned rows. Useful as a lightweight
+ *       correctness check without full grading overhead.
+ *     tags:
+ *       - Grading
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ComparisonRequest'
+ *     responses:
+ *       '200':
+ *         description: Result-set comparison completed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ResultSetComparisonResponse'
+ *       '400':
+ *         description: Invalid request or connection failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: Comparison failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *
+ * /api/grading/compare/ast:
+ *   post:
+ *     summary: Compare AST structures of two SQL queries
+ *     description: >
+ *       Parses both the reference and student queries and compares their
+ *       abstract syntax trees at the structural level (SELECT columns, alias
+ *       resolution, unsupported structure detection). No database execution
+ *       is required.
+ *     tags:
+ *       - Grading
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ComparisonRequest'
+ *     responses:
+ *       '200':
+ *         description: AST comparison completed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ASTComparisonResponse'
+ *       '400':
+ *         description: Invalid request or parse failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: Comparison failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *
+ * /api/grading/compare/execution-plan:
+ *   post:
+ *     summary: Compare query execution plans
+ *     description: >
+ *       Runs EXPLAIN (FORMAT JSON) for both queries and diffs the resulting
+ *       plans element by element (WHERE, GROUP BY, ORDER BY, JOIN). Returns
+ *       per-element feedback and a penalty point total.
+ *     tags:
+ *       - Grading
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ComparisonRequest'
+ *     responses:
+ *       '200':
+ *         description: Execution-plan comparison completed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ExecutionPlanComparisonResponse'
+ *       '400':
+ *         description: Invalid request or parse failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: Comparison failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+
+/**
  * Mounts four grading-related endpoints under /api/grading:
  *
  *   POST /api/grading/grade                    — full orchestrated grading

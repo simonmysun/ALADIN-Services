@@ -28,6 +28,182 @@ import { t, resolveLanguageCode, SupportedLanguage } from '../../shared/i18n';
 const sqlParser = new Parser();
 
 /**
+ * @openapi
+ * /api/description/template:
+ *   post:
+ *     summary: Generate a template-based SQL description
+ *     description: >
+ *       Produces a deterministic, AST-driven natural-language description of
+ *       the supplied SQL query using a hand-crafted template engine. No LLM
+ *       or external API call is made.
+ *     tags:
+ *       - Description
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/DescriptionRequest'
+ *     responses:
+ *       '200':
+ *         description: Description generated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DescriptionResponse'
+ *       '400':
+ *         description: Invalid request, unregistered database, or SQL parse failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: Template engine failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *
+ * /api/description/llm/default:
+ *   post:
+ *     summary: Generate an LLM description (default, temperature 0)
+ *     description: >
+ *       Uses a single-shot LLM call at temperature 0 to produce a
+ *       natural-language description of the SQL query. Requires
+ *       OPENAI_API_KEY to be set; falls back to the template engine otherwise.
+ *     tags:
+ *       - Description
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/DescriptionRequest'
+ *     responses:
+ *       '200':
+ *         description: Description generated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DescriptionResponse'
+ *       '400':
+ *         description: Invalid request or unregistered database.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: LLM call failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *
+ * /api/description/llm/creative:
+ *   post:
+ *     summary: Generate a creative LLM description (temperature 0.7)
+ *     description: >
+ *       Uses a single-shot LLM call at temperature 0.7 to produce a more
+ *       expressive natural-language description of the SQL query.
+ *     tags:
+ *       - Description
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/DescriptionRequest'
+ *     responses:
+ *       '200':
+ *         description: Description generated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DescriptionResponse'
+ *       '400':
+ *         description: Invalid request or unregistered database.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: LLM call failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *
+ * /api/description/llm/multi-step:
+ *   post:
+ *     summary: Generate a multi-step LLM description
+ *     description: >
+ *       Runs a three-stage chained LLM pipeline to progressively build a
+ *       high-quality natural-language description of the SQL query.
+ *     tags:
+ *       - Description
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/DescriptionRequest'
+ *     responses:
+ *       '200':
+ *         description: Description generated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DescriptionResponse'
+ *       '400':
+ *         description: Invalid request or unregistered database.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: LLM pipeline failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *
+ * /api/description/hybrid:
+ *   post:
+ *     summary: Generate a hybrid template + LLM description
+ *     description: >
+ *       Feeds the deterministic template engine output as context into an LLM
+ *       for natural-language post-processing, combining the reliability of
+ *       templates with the fluency of an LLM.
+ *     tags:
+ *       - Description
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/DescriptionRequest'
+ *     responses:
+ *       '200':
+ *         description: Description generated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DescriptionResponse'
+ *       '400':
+ *         description: Invalid request, unregistered database, or SQL parse failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: Hybrid generation failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+
+/**
  * Provides individual endpoints for each description generation approach.
  *
  * All routes are mounted under /api/description:

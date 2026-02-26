@@ -1,11 +1,13 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import path from 'path';
+import swaggerUi from 'swagger-ui-express';
 import { DatabaseController } from '../database/database-controller';
 import { TaskGenerationController } from '../generation/task-generation-controller';
 import { GradingController } from '../grading/grading-controller';
 import { DescriptionController } from '../generation/description/description-controller';
 import { QueryExecutionController } from '../query/query-execution-controller';
+import { getSwaggerSpec } from '../openapi';
 import dotenv from 'dotenv';
 const api = express();
 
@@ -14,6 +16,8 @@ api.use(express.static(path.join(__dirname, '..', 'test-page')));
 api.get('/', (req, res) => {
 	res.sendFile(path.join(__dirname, '..', 'test-page', 'test-page.html'));
 });
+
+api.use('/api-docs', swaggerUi.serve, swaggerUi.setup(getSwaggerSpec()));
 
 export function registerControllers(
 	databaseController: DatabaseController,

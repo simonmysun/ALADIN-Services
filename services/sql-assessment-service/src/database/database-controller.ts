@@ -7,6 +7,44 @@ import { validateConnectionInfo } from '../shared/utils/validation';
 import { t, resolveLanguageCode } from '../shared/i18n';
 import { IAliasMap } from '../shared/interfaces/domain';
 
+/**
+ * @openapi
+ * /api/database/analyze-database:
+ *   post:
+ *     summary: Analyze and register a PostgreSQL database
+ *     description: >
+ *       Connects to a PostgreSQL database, extracts its full schema metadata
+ *       (tables, columns, FK relationships, cardinalities), and stores it in
+ *       the in-memory registry under a generated database key derived from
+ *       host, port, and schema. The key is required by all subsequent endpoints.
+ *     tags:
+ *       - Database
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AnalyzeDatabaseRequest'
+ *     responses:
+ *       '200':
+ *         description: Database successfully analyzed and registered.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MessageResponse'
+ *       '400':
+ *         description: Invalid connection info or connection failure.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: Schema extraction failed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 export class DatabaseController {
     public router: Router;
     databaseAnalyzer: DatabaseAnalyzer;

@@ -2,9 +2,11 @@
 	"devDependencies": {
 		"@types/express": "^5.0.0",
 		"@types/node": "20.12.7",
+		"@types/swagger-jsdoc": "^6.0.4",
+		"@types/swagger-ui-express": "^4.1.8",
 		"@types/uuid": "^10.0.0",
 		"@vitest/coverage-v8": "^4.0.18",
-		"gts": "^5.3.1",
+		"gts": "^7.0.0",
 		"node-sql-parser": "^5.3.5",
 		"openai": "^4.52.0",
 		"pg-mem": "^3.0.13",
@@ -12,22 +14,30 @@
 		"vitest": "^4.0.18"
 	},
 	"scripts": {
+		"build": "tsc -p tsconfig.json",
 		"dev": "npx ts-node src/index.ts",
+		"generate-openapi": "npx ts-node src/generate-openapi.ts",
+		"lint": "gts lint",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
+		"@eslint/js": "^10.0.1",
 		"@langchain/community": "^0.3.20",
 		"@langchain/core": "^0.3.26",
 		"@langchain/openai": "^0.3.0",
 		"body-parser": "^1.20.3",
 		"dotenv": "^16.4.7",
 		"express": "^4.21.2",
+		"jiti": "^2.6.1",
 		"langchain": "^0.3.8",
 		"pg": "^8.12.0",
 		"reflect-metadata": "^0.2.2",
+		"swagger-jsdoc": "^6.2.8",
+		"swagger-ui-express": "^5.0.1",
 		"typeorm": "^0.3.20",
+		"typescript-eslint": "^8.56.1",
 		"uuid": "^10.0.0"
 	}
 }

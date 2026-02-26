@@ -1,15 +1,24 @@
 # ALADIN-Functions Monorepo
 
+## Services
+
+| Service                                                               | Language   | Description                                                              |
+| --------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------ |
+| [graph-rewriting-service](services/graph-rewriting-service/README.md) | TypeScript | Graph Rewriting as a Service — SPO graph transformations backed by Neo4j |
+| [sql-assessment-service](services/sql-assessment-service/README.md)   | TypeScript | SQL Assessment — schema analysis, SQL task generation, and query grading |
+
+## For Developers:
+
 This repository is a polyglot monorepo. Each service lives in its own directory under `services/` and is fully self-contained with its own dependencies, tests, and build pipeline. Services written in the same language may share code via the `packages/` directory.
 
-## Repository structure
+### Repository structure
 
 ```
 ALADIN-Functions/
 ├── services/                        # One directory per service
 │   └── <service-name>/
 │       ├── src/                     # Service source code
-│       ├── Makefile                 # Standard targets: build, test, lint, start, clean
+│       ├── Makefile                 # Standard targets: build, test, lint, start, clean, docker-build, generate-openapi
 │       ├── <lang-manifest>          # package.json / pyproject.toml / Cargo.toml / etc.
 │       ├── Dockerfile               # (optional) container image
 │       ├── docker-compose.yml       # (optional) local dev dependencies
@@ -31,16 +40,18 @@ ALADIN-Functions/
 └── README.md                        # This file
 ```
 
-## Root Makefile targets
+### Root Makefile targets
 
 Run a target across **all** services and packages at once:
 
 ```sh
-make prep    # Preps every service, e.g. installing dependencies
-make build   # Build every service
-make test    # Test every service
-make lint    # Lint every service
-make clean   # Remove all build artifacts
+make prep              # Preps every service, e.g. installing dependencies
+make build             # Build every service
+make test              # Test every service
+make lint              # Lint every service
+make clean             # Remove all build artifacts
+make docker-build      # Build Docker images for every service
+make generate-openapi  # Generate OpenAPI specs for every service
 ```
 
 Target a **single** service directly:
@@ -50,29 +61,31 @@ make -C services/<service-name> build
 make -C services/<service-name> test
 ```
 
-## Service Makefile contract
+### Service Makefile contract
 
 Every service must expose these targets in its own `Makefile`:
 
-| Target  | Description                        |
-| ------- | ---------------------------------- |
-| `prep`  | Prep service, e.g. install deps    |
-| `build` | Compile or bundle the service      |
-| `test`  | Run all tests (unit + integration) |
-| `lint`  | Run linters and formatters         |
-| `start` | Start the service locally          |
-| `clean` | Remove build artifacts             |
+| Target             | Description                        |
+| ------------------ | ---------------------------------- |
+| `prep`             | Prep service, e.g. install deps    |
+| `build`            | Compile or bundle the service      |
+| `test`             | Run all tests (unit + integration) |
+| `lint`             | Run linters and formatters         |
+| `start`            | Start the service locally          |
+| `clean`            | Remove build artifacts             |
+| `docker-build`     | Build the service's Docker image   |
+| `generate-openapi` | Generate the OpenAPI spec          |
 
 Each service uses its own language-native tooling internally (`npm`, `pip`, `cargo`, etc.). The `Makefile` is the uniform interface that the root orchestrator calls.
 
-## Adding a new service
+### Adding a new service
 
 1. Create `services/<new-service>/`
 2. Add a `Makefile` with the five standard targets above
 3. Add a `.github/workflows/service-<new-service>.yml` with a `paths:` filter scoped to `services/<new-service>/**`
 4. Add a `README.md` describing the service
 
-### CI workflow template
+#### CI workflow template
 
 ```yaml
 name: <new-service>
@@ -116,7 +129,7 @@ jobs:
       - run: make build
 ```
 
-## Adding shared code
+### Adding shared code
 
 When two or more services in the same language need to share code, add a package under `packages/<language>/<package-name>/`. Give it the same `Makefile` contract (`build`, `test`, `lint`, `clean`) so the root orchestrator can target it too.
 
@@ -124,9 +137,3 @@ Reference the shared package from a service using a local path dependency:
 
 - **TypeScript:** `"dependencies": { "@repo/shared": "file:../../packages/typescript/shared" }`
 - **Python:** `dependencies = [{ path = "../../packages/python/shared", editable = true }]` in `pyproject.toml`
-
-## Services
-
-| Service                                                               | Language   | Description                                                              |
-| --------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------ |
-| [graph-rewriting-service](services/graph-rewriting-service/README.md) | TypeScript | Graph Rewriting as a Service — SPO graph transformations backed by Neo4j |
