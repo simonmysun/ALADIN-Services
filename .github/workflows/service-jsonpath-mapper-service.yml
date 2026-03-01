@@ -47,6 +47,14 @@ jobs:
         run: npm run build
       - name: Run tests
         run: npm run test
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: services/jsonpath-mapper-service/coverage/lcov.info
+          flags: jsonpath-mapper-service
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+        if: always()
 
   generate-openapi:
     name: Generate OpenAPI Spec

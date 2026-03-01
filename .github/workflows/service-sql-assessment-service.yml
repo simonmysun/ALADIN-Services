@@ -45,6 +45,14 @@ jobs:
         run: npm ci
       - name: Run tests
         run: npm run test
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: services/sql-assessment-service/coverage/lcov.info
+          flags: sql-assessment-service
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+        if: always()
 
   generate-openapi:
     name: Generate OpenAPI Spec

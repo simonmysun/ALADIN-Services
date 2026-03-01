@@ -14,7 +14,7 @@ export default defineConfig({
 		},
 		exclude: [...configDefaults.exclude, './demo/*', './examples/*'],
 		coverage: {
-			reporter: ['text', 'html'],
+			reporter: ['text', 'html', 'lcov'],
 			reportsDirectory: './test/coverage',
 			exclude: [
 				...coverageConfigDefaults.exclude,
