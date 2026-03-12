@@ -1,0 +1,6 @@
+__pycache__/main.cpython-312.pyc
+__pycache__/
+.env
+.vscode
+output.json
+.coverage
