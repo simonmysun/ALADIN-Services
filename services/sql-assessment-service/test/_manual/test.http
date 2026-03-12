@@ -102,7 +102,7 @@ content-type: application/json
     },
 	"gradingRequest": {
 		"taskId": "4f7c66ed-e4e5-422e-8d6f-ef4ee3876d02",
-		"studentQuery": "SELECT kunde.WOHNORT, COUNT(kunde.KDNR) FROM test.kunde GROUP BY kunde.WOHNORT HAVING COUNT(kunde.KDNR) > 1",
+		"studentQuery": "SELECT kunde.WOHNORT, COUNT(kunde.KDNR) FROM kunde GROUP BY kunde.WOHNORT HAVING COUNT(kunde.KDNR) > 1",
         "referenceQuery": "SELECT * FROM PROJEKT"
 	},
 	"languageCode": "de",
