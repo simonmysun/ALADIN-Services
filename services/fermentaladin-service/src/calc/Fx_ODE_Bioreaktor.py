@@ -32,9 +32,7 @@ def Bioreaktor_ODE(x, y, Mpar, Fpar):  # Hier werden die ODEs definiert
     c_O2_Luft = 0.2095  # Sauerstoffgehalt Luft in mol(O2)/mol(Luft)
     c_CO2_Luft = 0.0004147  # CO2 Gehalt der Luft in mol(CO2)/mol(Luft)
     Vm_norm = 22.41396954  # molares Volumen bei Normbedingungen (0°C und 101,325 kPa) in L/mol
-    Luft_In = (
-        Fpar["Q_Air"] * 60 / Fpar["V_L"]
-    )  # ZuLuftstrom in NL/(L_Brühe*h) mit Q_Air in NL/min
+    Luft_In = Fpar["Q_Air"] * 60 / Fpar["V_L"]  # ZuLuftstrom in NL/(L_Brühe*h) mit Q_Air in NL/min
 
     # Berechnung der nicht differentiellen Gleichungen
 
@@ -54,25 +52,19 @@ def Bioreaktor_ODE(x, y, Mpar, Fpar):  # Hier werden die ODEs definiert
     # Produktbildungsrate
     # b = beta*cs1/(KMS1+cs1)*(1-(mu_s/mumax))^200; %Michaelis Menten Kinetik für nicht wachstumssassoziierte Produktbildung
     # Alternative Code (same speed)
-    if mu > 1 * 10 ** (
-        -3
+    if (
+        mu > 1 * 10 ** (-3)
     ):  # wenn mu größer ~0 dann keine nicht wachstumsassoziierte Produktbildung; bei numerischer Integration wird mu nie exakt 0
         beta = 0
     else:
         beta = Mpar["beta"] * c_S1 / (Mpar["KMS1"] + c_S1)
 
     qp = Mpar["Prod"] * (mu * Mpar["alpha"] + beta)  # Luedking Piret
-    OUR = c_x * (
-        mu / Mpar["YXO2"] + 0.001
-    )  # in g/(L*h) die 0.001 ist ein Platzhalter für den Erhaltungsstoffwechsel
+    OUR = c_x * (mu / Mpar["YXO2"] + 0.001)  # in g/(L*h) die 0.001 ist ein Platzhalter für den Erhaltungsstoffwechsel
     OUR = OUR / 32  # Umrechung in mol/(L*h)
     # Begasung / Sauerstoff
-    CER = (
-        OUR * Mpar["RQ_x"] + c_x * (qp / Mpar["Y_CO2_P"]) / 44
-    )  # Divison durch 44: Umrechung von g/L in mol/L
-    Luft_Out = (
-        Luft_In + c_x * (qp / Mpar["Y_CO2_P"]) / 44 * Vm_norm
-    )  # Volumen der Abluft ist um entstandenes CO2 höher
+    CER = OUR * Mpar["RQ_x"] + c_x * (qp / Mpar["Y_CO2_P"]) / 44  # Divison durch 44: Umrechung von g/L in mol/L
+    Luft_Out = Luft_In + c_x * (qp / Mpar["Y_CO2_P"]) / 44 * Vm_norm  # Volumen der Abluft ist um entstandenes CO2 höher
 
     #   Biomassebildung
     cx_r = mu * c_x

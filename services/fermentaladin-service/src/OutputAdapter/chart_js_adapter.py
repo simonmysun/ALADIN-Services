@@ -26,8 +26,8 @@ class ChartJSAdapter(OutputAdapter):
 
         df["Drehzahl"] = df["Drehzahl"] / 10
 
-        hochminus1 = "\u{207B}\u{00B9}"
-        cdot = "\u{00B7}"
+        hochminus1 = "\u207b\u00b9"
+        cdot = "\u00b7"
         labelfontsize = 18
         oliv = "#A0C382"
         petrol = "#5F9B8C"
@@ -159,7 +159,7 @@ class ChartJSAdapter(OutputAdapter):
                         "data": df["Drehzahl"].to_list(),
                     },
                     {
-                        "label": "Gel" + "\u{00F6}" + "stsauerstoff (DO)",
+                        "label": "Gel" + "\u00f6" + "stsauerstoff (DO)",
                         "yAxisID": "yR",
                         "fill": False,
                         "lineTension": 0.2,
