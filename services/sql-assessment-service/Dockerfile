@@ -18,6 +18,6 @@ WORKDIR /app
 
 COPY --from=build /app/build/index.js ./build/index.js
 
-EXPOSE 3333
+EXPOSE 3000
 
 CMD ["node", "build/index.js"]
