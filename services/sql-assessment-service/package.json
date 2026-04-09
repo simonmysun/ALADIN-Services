@@ -19,7 +19,8 @@
 		"lint": "npx eslint ./src",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"test:coverage": "vitest run --coverage"
+		"test:coverage": "vitest run --coverage",
+		"cli": "node build/src/cli/index.js"
 	},
 	"dependencies": {
 		"@eslint/js": "^10.0.1",
