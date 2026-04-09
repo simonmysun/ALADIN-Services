@@ -1,14 +1,23 @@
-FROM node:20
+# ---- build stage ----
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-COPY package.json ./
-COPY tsconfig.json ./
+COPY package.json package-lock.json ./
+RUN npm ci
 
-RUN npm install
+COPY src/ src/
+COPY tsconfig.json import-meta-url.js ./
 
-COPY ./ ./
+RUN npm run build
+
+# ---- production stage ----
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY --from=build /app/build/index.js ./build/index.js
 
 EXPOSE 3333
 
-CMD ["npx", "ts-node", "src/index.ts"]
+CMD ["node", "build/index.js"]
