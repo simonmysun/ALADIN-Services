@@ -1,0 +1,8 @@
+test/
+http-tests/
+*.md
+.gitignore
+.demo.env
+Makefile
+__pycache__/
+.ruff_cache/
