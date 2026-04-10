@@ -18,9 +18,6 @@ FROM node:22-alpine
 WORKDIR /app
 
 COPY --from=build /app/dist/ ./
-# @fastify/swagger-ui reads static assets (Swagger UI HTML/CSS/JS) relative
-# to __dirname at runtime — keep them next to the bundle.
-COPY --from=build /app/node_modules/@fastify/swagger-ui/static ./static
 
 # ── Environment defaults ───────────────────────────────────────────────────────
 ENV NODE_ENV=production \

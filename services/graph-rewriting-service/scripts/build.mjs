@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const distDir = resolve('dist');
 const staticSourceDir = resolve('src/static');
 const staticTargetDir = resolve(distDir, 'static');
+const swaggerUiStaticDir = resolve('node_modules/@fastify/swagger-ui/static');
 
 const sharedOptions = {
 	bundle: true,
@@ -37,5 +38,8 @@ if (!cliContent.startsWith('#!/usr/bin/env node')) {
 }
 
 await mkdir(staticTargetDir, { recursive: true });
+// Copy src/static (project's own static files)
 await cp(staticSourceDir, staticTargetDir, { recursive: true });
+// Copy @fastify/swagger-ui static files for Swagger UI
+await cp(swaggerUiStaticDir, staticTargetDir, { recursive: true });
 await chmod(cliEntry, 0o755);

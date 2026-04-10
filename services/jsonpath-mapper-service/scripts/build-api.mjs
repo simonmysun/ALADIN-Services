@@ -27,3 +27,6 @@ await Promise.all([
     outfile: 'dist/cli.cjs',
   }),
 ]);
+
+// Copy @fastify/swagger-ui static files so they can be served at runtime
+cpSync('node_modules/@fastify/swagger-ui/static', 'dist/static', { recursive: true });
