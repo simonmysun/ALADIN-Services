@@ -17,43 +17,32 @@ RUN npm run build
 RUN npm ci --omit=dev
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
-# Uses the official Neo4j image as base so Neo4j is available out of the box.
-# Node 22 is installed via NodeSource.
-FROM neo4j:5.25.1
+# Lightweight runtime using only Node.js.
+# Neo4j is deployed as a separate service (configured via environment variables).
+FROM node:22-slim
 
-# Install Node.js 22 (NodeSource) and supervisord
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates supervisor && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 
 # Copy compiled app and production node_modules from builder
-WORKDIR /app
 COPY --from=builder /build/dist ./dist
 COPY --from=builder /build/node_modules ./node_modules
 
-# Copy process manager config and entrypoint
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY scripts/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Create log directory for supervisord
-RUN mkdir -p /var/log/supervisor
-
 # ── Environment defaults ───────────────────────────────────────────────────────
-# NEO4J_AUTH is constructed in entrypoint.sh from USERNAME + PASSWORD.
-# NEO4J_PASSWORD has a default, but should be supplied at runtime.
+# Neo4j connection is configured via environment variables.
+# When using docker-compose, these will be set from the Neo4j service name.
 ENV APP_ENV=production \
-    NEO4J_URI=bolt://localhost:7687 \
+    NODE_ENV=production \
+    NEO4J_URI=bolt://neo4j:7687 \
     NEO4J_USERNAME=neo4j \
-    NEO4J_PASSWORD=graph_rewriting
+    NEO4J_PASSWORD=neo4j
 
-
-# ── Ports ──────────────────────────────────────────────────────────────────────
+# ── Port ────────────────────────────────────────────────────────────────────────
 # 8080  – Fastify HTTP API
-# 7474  – Neo4j Browser UI
-# 7687  – Neo4j Bolt
-EXPOSE 8080 7474 7687
+EXPOSE 8080
 
-ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
+# Health check (optional)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:8080/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
+# Start application
+CMD ["node", "dist/index.js"]
