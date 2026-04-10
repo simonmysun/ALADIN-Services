@@ -390,9 +390,6 @@ async function main() {
 }
 
 // Only run main() when this file is the entry point, not when imported for testing.
-const isDirectRun =
-	process.argv[1]?.endsWith('/cli.ts') || process.argv[1]?.endsWith('/cli.js');
-
-if (isDirectRun) {
+if (require.main === module) {
 	main();
 }

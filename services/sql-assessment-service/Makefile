@@ -27,4 +27,4 @@ generate-openapi:
 
 cli:
 	npm run build
-	@echo "CLI ready: node build/src/cli/index.js --help"
+	@echo "CLI ready: node build/cli/index.js --help"
