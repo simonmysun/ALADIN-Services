@@ -11,13 +11,11 @@ import {
 	ErrorResponseSchema,
 } from './schemas/map.schema.js';
 
-// Read version from package.json — tsx supports JSON imports
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const pkg = require('../../package.json') as {
-	version: string;
-	description: string;
-};
+// Version is read from the npm_package_version env var
+// (set automatically by `npm start` or via Dockerfile ENV).
+const PKG_VERSION = process.env.npm_package_version ?? '0.0.0';
+const PKG_DESCRIPTION =
+	"A json to json transformation utility with a few nice features to use when translating for example API responses into a domain object for use in your domain-driven JavaScript applications. Can be used in React applications with the 'useMapper' hook.";
 
 /**
  * Creates and configures the Fastify server instance.
@@ -41,14 +39,14 @@ export async function buildServer() {
 			info: {
 				title: 'jsonpath-mapper API',
 				description:
-					pkg.description +
+					PKG_DESCRIPTION +
 					'\n\n' +
 					'This REST API wraps the `jsonpath-mapper` library, exposing its ' +
 					'JSON-to-JSON transformation capabilities over HTTP.\n\n' +
 					'**Limitations:** Template values that require JavaScript functions ' +
 					'(`$formatting`, `$return`, `$disable`) cannot be expressed in a ' +
 					'JSON request body. Use the npm library directly for those cases.',
-				version: pkg.version,
+				version: PKG_VERSION,
 				contact: {
 					url: 'https://github.com/neilflatley/jsonpath-mapper',
 				},
