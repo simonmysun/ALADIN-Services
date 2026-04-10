@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 import { build } from 'esbuild';
+import { readFileSync, cpSync, rmSync } from 'fs';
+
+// Read version and description from package.json
+const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
+const PKG_VERSION = pkg.version;
+const PKG_DESCRIPTION = pkg.description;
 
 const shared = {
   bundle: true,
@@ -8,6 +14,9 @@ const shared = {
   format: 'cjs',
   minify: true,
 };
+
+// Clean dist directory
+rmSync('dist', { recursive: true, force: true });
 
 await Promise.all([
   // API server bundle
@@ -18,7 +27,11 @@ await Promise.all([
     // Shim import.meta.url → pathToFileURL(__filename) so that packages like
     // @fastify/swagger-ui can resolve __dirname for their static assets.
     inject: ['./import-meta-url.js'],
-    define: { 'import.meta.url': 'import_meta_url' },
+    define: {
+      'import.meta.url': 'import_meta_url',
+      '__PKG_VERSION__': JSON.stringify(PKG_VERSION),
+      '__PKG_DESCRIPTION__': JSON.stringify(PKG_DESCRIPTION),
+    },
   }),
   // CLI bundle
   build({

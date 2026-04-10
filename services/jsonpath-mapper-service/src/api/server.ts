@@ -10,12 +10,34 @@ import {
 	MapResponseSchema,
 	ErrorResponseSchema,
 } from './schemas/map.schema.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-// Version is read from the npm_package_version env var
-// (set automatically by `npm start` or via Dockerfile ENV).
-const PKG_VERSION = process.env.npm_package_version ?? '0.0.0';
-const PKG_DESCRIPTION =
-	"A json to json transformation utility with a few nice features to use when translating for example API responses into a domain object for use in your domain-driven JavaScript applications. Can be used in React applications with the 'useMapper' hook.";
+// Version and description are injected at build time by esbuild's define option.
+// For development (tsx), fall back to reading from package.json.
+declare const __PKG_VERSION__: string;
+declare const __PKG_DESCRIPTION__: string;
+
+let PKG_VERSION = '0.0.0';
+let PKG_DESCRIPTION = '';
+
+// Try to use injected constants (production build), fall back to package.json (development)
+try {
+	PKG_VERSION = __PKG_VERSION__;
+	PKG_DESCRIPTION = __PKG_DESCRIPTION__;
+} catch {
+	// Development mode: read from package.json
+	try {
+		const __dirname = dirname(fileURLToPath(import.meta.url));
+		const pkgPath = join(__dirname, '../../../package.json');
+		const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+		PKG_VERSION = pkg.version ?? '0.0.0';
+		PKG_DESCRIPTION = pkg.description ?? '';
+	} catch {
+		// Fallback defaults already set above
+	}
+}
 
 /**
  * Creates and configures the Fastify server instance.
