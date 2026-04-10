@@ -44,5 +44,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD node -e "require('http').get('http://localhost:8080/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-# Start application
+# CLI is also available inside the container:
+#   docker run --rm -e NEO4J_URI=... graph-rewriting-service node dist/cli.js transform /data/request.json
+
+# Start API server by default
 CMD ["node", "dist/index.js"]
