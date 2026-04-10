@@ -1,5 +1,5 @@
 # ── Stage 1: builder ─────────────────────────────────────────────────────────
-# Compiles TypeScript to JavaScript and installs production-only dependencies.
+# Bundles TypeScript to JavaScript via esbuild.
 FROM node:22-slim AS builder
 
 WORKDIR /build
@@ -8,24 +8,21 @@ WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy source and compile
+# Copy source and build
 COPY tsconfig.json ./
+COPY scripts/ ./scripts/
 COPY src/ ./src/
 RUN npm run build
 
-# Prune to production deps only
-RUN npm ci --omit=dev
-
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
-# Lightweight runtime using only Node.js.
+# Lightweight runtime using bundled JavaScript only.
 # Neo4j is deployed as a separate service (configured via environment variables).
-FROM node:22-slim
+FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy compiled app and production node_modules from builder
+# Copy bundled app output from builder
 COPY --from=builder /build/dist ./dist
-COPY --from=builder /build/node_modules ./node_modules
 
 # ── Environment defaults ───────────────────────────────────────────────────────
 # Neo4j connection is configured via environment variables.

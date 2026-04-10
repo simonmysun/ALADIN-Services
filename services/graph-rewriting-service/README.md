@@ -54,11 +54,19 @@ This separation reduces image size and enables independent scaling.
 
 ## Architecture
 
+### Build Pipeline
+
+- `npm run build` now bundles the service with esbuild.
+- `npm run typecheck` runs TypeScript checks without emitting files.
+- The build emits bundled artifacts to `dist/index.js` and `dist/cli.js`.
+- Static assets from `src/static` are copied to `dist/static` during the build.
+
 ### Docker Images
 
-- **graph-rewriting-service**: Lightweight Node.js container based on `node:22-slim`
+- **graph-rewriting-service**: Lightweight Node.js container based on `node:22-alpine`
   - Runs the Fastify HTTP API
   - Connects to Neo4j via environment variables
+  - Contains bundled runtime artifacts only (no `node_modules` in the final image)
   - No embedded database or process manager
 
 - **neo4j** (from official image): Graph database service
