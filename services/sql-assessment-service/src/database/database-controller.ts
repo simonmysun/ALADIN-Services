@@ -1,14 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { DataSource } from 'typeorm';
 import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
+import { PGlite } from '@electric-sql/pglite';
 import { DatabaseAnalyzer } from './database-analyzer';
 import {
 	connectToDatabase,
 	generateDatabaseKey,
+	generatePGliteKey,
 } from '../shared/utils/database-utils';
 import { validateConnectionInfo } from '../shared/utils/validation';
-import { t, resolveLanguageCode } from '../shared/i18n';
+import { t, resolveLanguageCode, SupportedLanguage } from '../shared/i18n';
 import { IAliasMap } from '../shared/interfaces/domain';
+import { pgliteInstances } from './internal-memory';
 
 /**
  * @openapi
@@ -80,6 +83,12 @@ export class DatabaseController {
 				.json({ message: t('INVALID_CONNECTION_INFO', lang) });
 		}
 
+		// ---- PGlite branch --------------------------------------------------
+		if ((connectionInfo as any)?.type === 'pglite') {
+			return this.analyzePGliteDatabase(connectionInfo as any, lang, res);
+		}
+		// ---------------------------------------------------------------------
+
 		const validationError = validateConnectionInfo(connectionInfo, lang);
 		if (validationError) {
 			return res.status(400).json({ message: validationError });
@@ -141,5 +150,73 @@ export class DatabaseController {
 			console.log(error);
 		}
 		return res.status(400).json({ message: t('UNABLE_TO_CONNECT', lang) });
+	}
+
+	// -------------------------------------------------------------------------
+	// PGlite helpers
+	// -------------------------------------------------------------------------
+
+	private async analyzePGliteDatabase(
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		rawInfo: any,
+		lang: SupportedLanguage,
+		res: Response,
+	): Promise<Response> {
+		const { databaseId, sqlContent } = rawInfo ?? {};
+
+		if (!databaseId || typeof databaseId !== 'string') {
+			return res
+				.status(400)
+				.json({ message: t('INVALID_CONNECTION_INFO', lang) });
+		}
+		if (!sqlContent || typeof sqlContent !== 'string') {
+			return res
+				.status(400)
+				.json({ message: t('INVALID_CONNECTION_INFO', lang) });
+		}
+
+		// Close and evict any existing instance for this id
+		const existing = pgliteInstances.get(databaseId);
+		if (existing) {
+			try {
+				await existing.close();
+			} catch {
+				/* ignore */
+			}
+			pgliteInstances.delete(databaseId);
+		}
+
+		let db: PGlite;
+		try {
+			db = new PGlite();
+			await db.exec(sqlContent);
+		} catch (error) {
+			console.error('PGlite initialisation failed', error);
+			return res
+				.status(500)
+				.json({ message: t('DATABASE_SCHEMA_EXTRACTION_FAILED', lang) });
+		}
+
+		const key = generatePGliteKey(databaseId);
+		const success = await this.databaseAnalyzer.extractSchemaFromPGlite(
+			db,
+			key,
+		);
+
+		if (!success) {
+			try {
+				await db.close();
+			} catch {
+				/* ignore */
+			}
+			return res
+				.status(500)
+				.json({ message: t('DATABASE_SCHEMA_EXTRACTION_FAILED', lang) });
+		}
+
+		pgliteInstances.set(databaseId, db);
+		return res
+			.status(200)
+			.json({ message: t('DATABASE_ANALYSIS_SUCCESS', lang) });
 	}
 }
