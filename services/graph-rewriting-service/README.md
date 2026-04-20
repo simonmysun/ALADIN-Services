@@ -17,16 +17,28 @@ Next an .env file should be created by copying the .env.example and setting the 
 
 ### Development Environment
 
-To run the application in development mode with external Neo4j:
+The application supports two database backends:
+
+#### In-Memory (default, no Neo4j needed)
+
+Simply start the application — no external database required:
+
+```bash
+npm run dev
+```
+
+#### With Neo4j
+
+To run with Neo4j as the database backend:
 
 1. Start Neo4j container:
     ```bash
     docker compose -f docker-compose.dev.yml up
     ```
 
-2. In another terminal, start the application:
+2. In another terminal, start the application with neo4j backend:
     ```bash
-    npm run dev
+    DB_BACKEND=neo4j npm run dev
     ```
 
 If using VSCode you can instead run the VSCode-Task `Start dev environment` as a shortcut.
@@ -78,9 +90,10 @@ This separation reduces image size and enables independent scaling.
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
 | `APP_ENV` | `production` | No | Application environment: `development`, `production` |
-| `NEO4J_URI` | `bolt://neo4j:7687` | No | Neo4j Bolt connection URI |
-| `NEO4J_USERNAME` | `neo4j` | No | Neo4j username |
-| `NEO4J_PASSWORD` | (none) | **Yes** | Neo4j password (must be set in production) |
+| `DB_BACKEND` | `memory` | No | Database backend: `memory` (in-memory, no external DB) or `neo4j` |
+| `NEO4J_URI` | `bolt://neo4j:7687` | No | Neo4j Bolt connection URI (only when `DB_BACKEND=neo4j`) |
+| `NEO4J_USERNAME` | `neo4j` | No | Neo4j username (only when `DB_BACKEND=neo4j`) |
+| `NEO4J_PASSWORD` | (none) | When neo4j | Neo4j password (must be set when using neo4j backend) |
 
 ## Documentation
 
