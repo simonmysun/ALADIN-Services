@@ -126,6 +126,48 @@ A very simple TicTacToe game againt a computer player powered by graph transform
 This testcase consists of a very basic web app built on the Vue.js Framework.
 You can install the project by first running `npm install`, then `npm run dev`.
 
+## Testing
+
+### Unit Tests
+
+```bash
+npm test
+```
+
+### Smoke Tests
+
+End-to-end smoke tests using `curl` against a running service.
+
+#### Memory backend only (no external dependencies)
+
+```bash
+make smoke-test
+```
+
+#### Memory + Neo4j backend
+
+Start a Neo4j container first, then run the smoke test with Neo4j credentials:
+
+```bash
+# Start Neo4j
+NEO4J_USERNAME=neo4j NEO4J_PASSWORD=<your-password> \
+  docker compose -f docker-compose.dev.yml up -d neo4j
+
+# Run smoke tests for both backends
+NEO4J_URI=bolt://localhost:7687 \
+NEO4J_USERNAME=neo4j \
+NEO4J_PASSWORD=<your-password> \
+  make smoke-test
+```
+
+When `NEO4J_URI` is not set, the Neo4j portion of the smoke test is skipped automatically.
+
+#### Teardown
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
 ## SwaggerUI / OpenAPI
 
 When the server is running, you can access the SwaggerUI / OpenAPI documentation via the following url:

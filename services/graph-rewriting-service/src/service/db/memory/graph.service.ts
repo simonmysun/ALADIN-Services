@@ -11,7 +11,6 @@ import {
 	DBGraphNACs,
 	EdgeUpdateRewriteOptions,
 	NodeUpdateRewriteOptions,
-	DBGraphNode,
 	DBGraphEdge,
 } from '../types';
 import { PatternNodeSchema } from '../../../types/patternnode.schema';
@@ -29,8 +28,8 @@ interface StoredEdge {
 }
 
 export class InMemoryGraphService implements IGraphDB {
-	private nodes: Map<string, StoredNode> = new Map();
-	private edges: Map<string, StoredEdge> = new Map();
+	private nodes = new Map<string, StoredNode>();
+	private edges = new Map<string, StoredEdge>();
 
 	public graphType: DBGraphType = 'undirected';
 
@@ -50,7 +49,8 @@ export class InMemoryGraphService implements IGraphDB {
 	public async updateNode(
 		metadata: DBGraphNodeMetadata,
 		internalId: DBGraphNodeInternalId,
-		oldTypes: string[] = [],
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		_oldTypes: string[] = [],
 		options: NodeUpdateRewriteOptions = {}
 	): Promise<DBGraphNodeResult> {
 		if (!internalId) {
