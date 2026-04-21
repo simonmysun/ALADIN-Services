@@ -311,6 +311,129 @@ neo4j_tests() {
     sleep 1
 }
 
+# ---- CLI tests (Neo4j only) ------------------------------------------------
+
+cli_tests() {
+    if [[ -z "${NEO4J_URI:-}" ]]; then
+        echo ""
+        echo "══════════════════════════════════════════════════════════════════════"
+        echo "  CLI tests — SKIPPED (NEO4J_URI not set)"
+        echo "  Set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD to run these tests."
+        echo "══════════════════════════════════════════════════════════════════════"
+        return
+    fi
+
+    echo ""
+    echo "══════════════════════════════════════════════════════════════════════"
+    echo "  Testing CLI (Neo4j backend: ${NEO4J_URI})"
+    echo "══════════════════════════════════════════════════════════════════════"
+
+    local cli="node dist/cli.js"
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    # helper: run CLI command, check exit code and optionally a string in output
+    cli_ok() {
+        local label="$1" needle="$2"
+        shift 2
+        local output
+        if output=$($cli "$@" 2>&1); then
+            if [[ -n "$needle" ]] && ! echo "$output" | grep -q "$needle"; then
+                red "  FAIL  $label — missing \"$needle\" in output"
+                red "         output: $output"
+                (( FAIL++ )) || true
+            else
+                green "  PASS  $label"
+                (( PASS++ )) || true
+            fi
+        else
+            red "  FAIL  $label — command exited with error"
+            red "         output: $output"
+            (( FAIL++ )) || true
+        fi
+    }
+
+    # Write fixture files
+    cat > "$tmpdir/node1.json" <<'EOF'
+{ "key": "cliNode1", "attributes": { "label": "CLI-Test" } }
+EOF
+    cat > "$tmpdir/node2.json" <<'EOF'
+{ "key": "cliNode2", "attributes": { "label": "CLI-Test2" } }
+EOF
+    cat > "$tmpdir/edge.json" <<'EOF'
+{ "key": "cliEdge1", "source": "cliNode1", "target": "cliNode2", "attributes": { "type": "cli-test" } }
+EOF
+    cat > "$tmpdir/transform.json" <<'EOF'
+{
+  "hostgraph": {
+    "options": { "type": "directed" },
+    "nodes": [
+      { "key": "A", "attributes": { "label": "A", "type": "Event" } },
+      { "key": "B", "attributes": { "label": "B", "type": "Function" } }
+    ],
+    "edges": [{ "key": "aToB", "source": "A", "target": "B", "attributes": {} }]
+  },
+  "rules": [{
+    "key": "add_node",
+    "patternGraph": {
+      "options": { "type": "directed" },
+      "nodes": [{ "key": "A", "attributes": { "label": "A" } }],
+      "edges": []
+    },
+    "replacementGraph": {
+      "options": { "type": "directed" },
+      "nodes": [
+        { "key": "A", "attributes": { "label": "A" } },
+        { "key": "C", "attributes": { "label": "C", "type": "NewNode" } }
+      ],
+      "edges": [{ "key": "aToC", "source": "A", "target": "C", "attributes": {} }]
+    }
+  }]
+}
+EOF
+    cat > "$tmpdir/find.json" <<'EOF'
+{
+  "hostgraph": {
+    "options": { "type": "directed" },
+    "nodes": [
+      { "key": "A", "attributes": { "label": "A", "type": "Event" } },
+      { "key": "B", "attributes": { "label": "B", "type": "Function" } }
+    ],
+    "edges": [{ "key": "aToB", "source": "A", "target": "B", "attributes": {} }]
+  },
+  "rules": [{
+    "key": "find_node",
+    "patternGraph": {
+      "options": { "type": "directed" },
+      "nodes": [{ "key": "A", "attributes": {} }],
+      "edges": []
+    }
+  }]
+}
+EOF
+
+    # 1. Node CRUD
+    cli_ok "cli: create-node"   '"key"'    create-node "$tmpdir/node1.json"
+    cli_ok "cli: create-node 2" '"key"'    create-node "$tmpdir/node2.json"
+    cli_ok "cli: get-nodes"     'cliNode1' get-nodes
+    cli_ok "cli: get-node"      '"label"'  get-node "cliNode1"
+
+    # 2. Edge CRUD
+    cli_ok "cli: create-edge"   '"key"'    create-edge "$tmpdir/edge.json"
+    cli_ok "cli: get-edge"      '"key"'    get-edge "cliEdge1"
+
+    # 3. Graph transformation (stateless — operates on provided hostgraph)
+    cli_ok "cli: transform"     'NewNode'  transform "$tmpdir/transform.json"
+    cli_ok "cli: find"          'nodes'    find      "$tmpdir/find.json"
+
+    # 4. Cleanup
+    cli_ok "cli: delete-edge"   ''         delete-edge  "cliEdge1"
+    cli_ok "cli: delete-node"   ''         delete-node  "cliNode1"
+    cli_ok "cli: delete-nodes"  ''         delete-nodes
+
+    rm -rf "$tmpdir"
+}
+
 # ---- main ------------------------------------------------------------------
 
 echo "graph-rewriting-service smoke tests"
@@ -322,6 +445,7 @@ npm run build
 
 memory_tests
 neo4j_tests
+cli_tests
 
 echo ""
 echo "════════════════════════════════════════════════════════════════════════"
