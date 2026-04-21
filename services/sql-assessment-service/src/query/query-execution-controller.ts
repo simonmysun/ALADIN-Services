@@ -16,6 +16,7 @@ import {
 } from './query-execution-service';
 import { t, resolveLanguageCode, SupportedLanguage } from '../shared/i18n';
 import { pgliteInstances } from '../database/internal-memory';
+import { DatabaseService } from '../database/database-service';
 
 /**
  * Exposes a single endpoint for executing a raw SQL SELECT query against a
@@ -79,9 +80,14 @@ import { pgliteInstances } from '../database/internal-memory';
 export class QueryExecutionController {
 	public router: Router;
 	private readonly queryExecutionService: QueryExecutionService;
+	private readonly databaseService?: DatabaseService;
 
-	constructor(queryExecutionService: QueryExecutionService) {
+	constructor(
+		queryExecutionService: QueryExecutionService,
+		databaseService?: DatabaseService,
+	) {
 		this.queryExecutionService = queryExecutionService;
+		this.databaseService = databaseService;
 		this.router = Router();
 		this.initializeRoutes();
 	}
@@ -119,6 +125,19 @@ export class QueryExecutionController {
 				.status(400)
 				.json({ message: t('MISSING_OR_EMPTY_QUERY', lang) });
 		}
+
+		// ---- auto-analyze ---------------------------------------------------
+		if (this.databaseService) {
+			const analyzed = await this.databaseService.ensureAnalyzed(
+				options.connectionInfo,
+				undefined,
+				lang,
+			);
+			if (!analyzed.ok) {
+				return res.status(analyzed.status).json({ message: analyzed.message });
+			}
+		}
+		// ---------------------------------------------------------------------
 
 		// ---- PGlite branch ------------------------------------------------
 		if ((options.connectionInfo as any)?.type === 'pglite') {

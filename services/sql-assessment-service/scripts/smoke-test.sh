@@ -9,7 +9,13 @@
 #   BASE_URL          Service base URL  (default: http://localhost:3000)
 #
 # PGlite path (no external DB needed):
-#   PGLITE_DB_ID      databaseId to use  (default: smoke-db)
+#   PGLITE_DB_ID          databaseId to use  (default: smoke-db)
+#
+# Init-SQL-file feature (optional — tests the PGLITE_INIT_SQL_FILE / --init-sql-file feature):
+#   SMOKE_TEST_INIT_SQL   Set to '1' to enable (server must be started with PGLITE_INIT_SQL_FILE
+#                         pointing to a valid .sql file containing at least one table)
+#   SMOKE_INIT_SQL_TABLE  A table name that exists in the configured init SQL file
+#                         (default: products)  — used to verify the file was actually loaded
 #
 # PostgreSQL path (optional — skipped if PG_HOST is not set):
 #   PG_HOST           Postgres host
@@ -142,21 +148,33 @@ INSERT INTO orders (product_id, quantity) VALUES (1, 5), (2, 3);'
         "$(jq -n --arg id "$PGLITE_DB_ID" \
             '{connectionInfo:{type:"pglite",databaseId:$id},query:"SELECT * FROM no_such_table"}')"
 
-    # 8. Missing sqlContent → 400
-    post "analyze-database — missing sqlContent (expect 400)" "400" \
-        "${BASE_URL}/api/database/analyze-database" \
-        "$(jq -n --arg id "$PGLITE_DB_ID" \
-            '{connectionInfo:{type:"pglite",databaseId:$id}}')"
+    # 8. Missing sqlContent → 400 when no init file; 200 when init file is configured
+    if [[ -z "${SMOKE_TEST_INIT_SQL:-}" ]]; then
+        post "analyze-database — missing sqlContent (expect 400)" "400" \
+            "${BASE_URL}/api/database/analyze-database" \
+            "$(jq -n --arg id "$PGLITE_DB_ID" \
+                '{connectionInfo:{type:"pglite",databaseId:$id}}')"
+    else
+        post "analyze-database — missing sqlContent (init-file provides it, expect 200)" "200" \
+            "${BASE_URL}/api/database/analyze-database" \
+            "$(jq -n --arg id "$PGLITE_DB_ID" \
+                '{connectionInfo:{type:"pglite",databaseId:$id}}')"
+    fi
 
     # 9. Missing databaseId → 400
     post "analyze-database — missing databaseId (expect 400)" "400" \
         "${BASE_URL}/api/database/analyze-database" \
         '{"connectionInfo":{"type":"pglite","sqlContent":"SELECT 1"}}'
 
-    # 10. Unregistered databaseId → 400
-    post "execute — unregistered databaseId (expect 400)" "400" \
-        "${BASE_URL}/api/query/execute" \
-        '{"connectionInfo":{"type":"pglite","databaseId":"__not_registered__"},"query":"SELECT 1"}'
+    # 10. Unregistered databaseId → 400 (only when no init-SQL file is configured,
+    #     because an init file auto-initialises any unknown databaseId)
+    if [[ -z "${SMOKE_TEST_INIT_SQL:-}" ]]; then
+        post "execute — unregistered databaseId (expect 400)" "400" \
+            "${BASE_URL}/api/query/execute" \
+            '{"connectionInfo":{"type":"pglite","databaseId":"__not_registered__"},"query":"SELECT 1"}'
+    else
+        green "  SKIP  execute — unregistered databaseId (init-SQL-file auto-initialises any databaseId)"
+    fi
 
     # 11. Re-register with different schema (replace)
     post "analyze-database — replace existing instance" "200" \
@@ -168,6 +186,48 @@ INSERT INTO orders (product_id, quantity) VALUES (1, 5), (2, 3);'
         "${BASE_URL}/api/query/execute" \
         "$(jq -n --arg id "$PGLITE_DB_ID" \
             '{connectionInfo:{type:"pglite",databaseId:$id},query:"SELECT * FROM categories"}')"
+}
+
+# ---- Init-SQL-file tests (optional) ---------------------------------------
+
+pglite_init_sql_file_tests() {
+    if [[ -z "${SMOKE_TEST_INIT_SQL:-}" ]]; then
+        echo ""
+        echo "── PGlite init-SQL-file tests — skipped (set SMOKE_TEST_INIT_SQL=1 to enable) ─"
+        return
+    fi
+
+    echo ""
+    echo "── PGlite init-SQL-file feature ────────────────────────────────────────"
+    echo "   (server must be started with PGLITE_INIT_SQL_FILE set to a valid file)"
+
+    local INIT_TABLE="${SMOKE_INIT_SQL_TABLE:-products}"
+    local NEW_DB="smoke-init-${RANDOM}"
+    local OVERRIDE_DB="smoke-override-${RANDOM}"
+
+    # 1. Fresh databaseId without sqlContent — init file provides the schema
+    post "init-sql-file — fresh databaseId, no sqlContent (expect 200)" "200" \
+        "${BASE_URL}/api/query/execute" \
+        "$(jq -n --arg id "$NEW_DB" \
+            '{connectionInfo:{type:"pglite",databaseId:$id},query:"SELECT 1 AS ping"}')" 
+
+    # 2. The init-file schema is actually usable (query a known table)
+    post "init-sql-file — query table from init file (expect 200)" "200" \
+        "${BASE_URL}/api/query/execute" \
+        "$(jq -n --arg id "$NEW_DB" --arg tbl "$INIT_TABLE" \
+            '{connectionInfo:{type:"pglite",databaseId:$id},query:("SELECT * FROM "+$tbl+" LIMIT 1")}')" 
+
+    # 3. Explicit sqlContent overrides the init file
+    post "init-sql-file — explicit sqlContent takes priority (expect 200)" "200" \
+        "${BASE_URL}/api/query/execute" \
+        "$(jq -n --arg id "$OVERRIDE_DB" \
+            '{connectionInfo:{type:"pglite",databaseId:$id,sqlContent:"CREATE TABLE override_tbl (id SERIAL PRIMARY KEY);"},query:"SELECT * FROM override_tbl"}')" 
+
+    # 4. analyze-database without sqlContent — init file counts as the schema
+    post "init-sql-file — analyze-database without sqlContent (expect 200)" "200" \
+        "${BASE_URL}/api/database/analyze-database" \
+        "$(jq -n --arg id "smoke-analyze-${RANDOM}" \
+            '{connectionInfo:{type:"pglite",databaseId:$id}}')" 
 }
 
 # ---- PostgreSQL tests (optional) -------------------------------------------
@@ -237,6 +297,7 @@ done
 echo " OK"
 
 pglite_tests
+pglite_init_sql_file_tests
 postgres_tests
 
 echo ""

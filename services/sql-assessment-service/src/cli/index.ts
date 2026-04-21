@@ -6,12 +6,16 @@ import { CLIRoute, extractRoutes, invokeHandler } from './express-cli-adapter';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// ---------------------------------------------------------------------------
+// Route table builder
+// ---------------------------------------------------------------------------
+
 /**
  * Build the full route table by walking every controller's Express Router.
  * The mount prefixes mirror those in rest-api.ts registerControllers().
  */
-function buildRouteTable(): CLIRoute[] {
-	const c = createControllers();
+function buildRouteTable(initSqlFile?: string): CLIRoute[] {
+	const c = createControllers({ pgliteInitSqlFile: initSqlFile });
 	return [
 		...extractRoutes(c.connectionController.router, '/api/database'),
 		...extractRoutes(c.taskGenerationController.router, '/api/generation'),
@@ -28,10 +32,13 @@ function printHelp(routes: CLIRoute[]) {
 		'Usage: sql-assess <command> [options]',
 		'',
 		'Options:',
-		'  -f, --file <path>   Read JSON body from file',
-		'  --stdin             Read JSON body from stdin',
-		'  --list              List all commands',
-		'  -h, --help          Show help',
+		'  -f, --file <path>              Read JSON body from file',
+		'  --stdin                        Read JSON body from stdin',
+		'  --list                         List all commands',
+		'  --init-sql-file <path>         SQL file used to initialise a PGlite database',
+		'                                 when sqlContent is not in the request body.',
+		'                                 Overrides the PGLITE_INIT_SQL_FILE env var.',
+		'  -h, --help                     Show help',
 		'',
 		'Commands:',
 		...routes.map((r) => `  ${r.command.padEnd(40)} ${r.method} ${r.path}`),
@@ -55,13 +62,20 @@ async function readStdin(): Promise<string> {
 async function main() {
 	const args = process.argv.slice(2);
 
+	// ── Resolve --init-sql-file early so it feeds buildRouteTable ────────────
+	const initSqlFileIdx = args.indexOf('--init-sql-file');
+	const initSqlFile =
+		initSqlFileIdx !== -1 && args[initSqlFileIdx + 1]
+			? path.resolve(args[initSqlFileIdx + 1])
+			: undefined;
+
 	if (
 		args.includes('--list') ||
 		args.includes('--help') ||
 		args.includes('-h') ||
 		args.length === 0
 	) {
-		const routes = buildRouteTable();
+		const routes = buildRouteTable(initSqlFile);
 		if (args.includes('--list')) {
 			for (const r of routes)
 				console.log(`${r.command}\t${r.method}\t${r.path}`);
@@ -72,7 +86,7 @@ async function main() {
 	}
 
 	const command = args[0];
-	const routes = buildRouteTable();
+	const routes = buildRouteTable(initSqlFile);
 	const route = routes.find((r) => r.command === command);
 
 	if (!route) {

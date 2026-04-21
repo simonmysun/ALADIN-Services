@@ -28,6 +28,7 @@ import {
 	ProximityHeuristic,
 	QueryProximityService,
 } from './query-proximity-service';
+import { DatabaseService } from '../database/database-service';
 
 // ---------------------------------------------------------------------------
 // Internal helper types
@@ -217,6 +218,7 @@ export class GradingController {
 		private readonly astComparator: ASTComparator,
 		private readonly executionPlanComparator: ExecutionPlanComparator,
 		private readonly queryProximityService: QueryProximityService = new QueryProximityService(),
+		private readonly databaseService?: DatabaseService,
 	) {
 		this.router = Router();
 		this.initializeRoutes();
@@ -285,6 +287,20 @@ export class GradingController {
 			res.status(400).json({ message: validationError });
 			return null;
 		}
+
+		// ---- auto-analyze ---------------------------------------------------
+		if (this.databaseService) {
+			const analyzed = await this.databaseService.ensureAnalyzed(
+				body.connectionInfo,
+				undefined,
+				lang,
+			);
+			if (!analyzed.ok) {
+				res.status(analyzed.status).json({ message: analyzed.message });
+				return null;
+			}
+		}
+		// ---------------------------------------------------------------------
 
 		const { host, port, schema } = body.connectionInfo;
 		const databaseKey = generateDatabaseKey(host!, port!, schema!);
@@ -380,6 +396,19 @@ export class GradingController {
 		if (validationError) {
 			return res.status(400).json({ message: validationError });
 		}
+
+		// ---- auto-analyze ---------------------------------------------------
+		if (this.databaseService) {
+			const analyzed = await this.databaseService.ensureAnalyzed(
+				connectionInfo,
+				undefined,
+				lang,
+			);
+			if (!analyzed.ok) {
+				return res.status(analyzed.status).json({ message: analyzed.message });
+			}
+		}
+		// ---------------------------------------------------------------------
 
 		const databaseKey = generateDatabaseKey(
 			connectionInfo.host!,

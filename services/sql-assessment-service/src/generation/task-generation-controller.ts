@@ -19,6 +19,7 @@ import {
 import { SQLQueryGenerationService } from './query/sql-query-generation-service';
 import { TaskDescriptionGenerationService } from './description/task-description-generation-service';
 import { t, resolveLanguageCode } from '../shared/i18n';
+import { DatabaseService } from '../database/database-service';
 
 /**
  * @openapi
@@ -66,13 +67,16 @@ export class TaskGenerationController {
 	public router: Router;
 	selectQueryGenerationService: SQLQueryGenerationService;
 	taskDescriptionGenerationService: TaskDescriptionGenerationService;
+	private readonly databaseService?: DatabaseService;
 
 	constructor(
 		selectQueryGenerationService: SQLQueryGenerationService,
 		taskDescriptionGenerationService: TaskDescriptionGenerationService,
+		databaseService?: DatabaseService,
 	) {
 		this.selectQueryGenerationService = selectQueryGenerationService;
 		this.taskDescriptionGenerationService = taskDescriptionGenerationService;
+		this.databaseService = databaseService;
 		this.router = Router();
 		this.initializeRoutes();
 	}
@@ -114,6 +118,19 @@ export class TaskGenerationController {
 		if (validationError) {
 			return res.status(400).json({ message: validationError });
 		}
+
+		// ---- auto-analyze ---------------------------------------------------
+		if (this.databaseService) {
+			const analyzed = await this.databaseService.ensureAnalyzed(
+				connectionInfo,
+				undefined,
+				lang,
+			);
+			if (!analyzed.ok) {
+				return res.status(analyzed.status).json({ message: analyzed.message });
+			}
+		}
+		// ---------------------------------------------------------------------
 
 		const databaseKey = generateDatabaseKey(
 			connectionInfo.host!,

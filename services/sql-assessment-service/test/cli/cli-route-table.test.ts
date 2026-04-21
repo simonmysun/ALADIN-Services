@@ -90,13 +90,13 @@ describe('CLI route table (integration)', () => {
 		expect(result.data).toHaveProperty('message');
 	});
 
-	it('database:analyze-database returns 500 for completely missing body', async () => {
+	it('database:analyze-database returns 400 for completely missing body', async () => {
 		const route = routes.find(
 			(r) => r.command === 'database:analyze-database',
 		)!;
 		const result = await invokeHandler(route.handler, {});
-		// Controller crashes (validateConnectionInfo gets undefined) → caught as 500
-		expect(result.statusCode).toBe(500);
+		// Controller validates connectionInfo → returns 400 for missing connection info
+		expect(result.statusCode).toBe(400);
 		expect(result.data).toHaveProperty('message');
 	});
 

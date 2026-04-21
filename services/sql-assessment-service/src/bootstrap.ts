@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { DatabaseAnalyzer } from './database/database-analyzer';
 import { DatabaseController } from './database/database-controller';
+import { DatabaseService } from './database/database-service';
 import { SQLQueryGradingService } from './grading/query-grading-service';
 import { GradingController } from './grading/grading-controller';
 import { ResultSetComparator } from './grading/result-set-comparator';
@@ -20,9 +21,26 @@ import { DescriptionController } from './generation/description/description-cont
 import { QueryExecutionController } from './query/query-execution-controller';
 import { QueryExecutionService } from './query/query-execution-service';
 
-export function createControllers() {
+export interface CreateControllersOptions {
+	/** Path to a SQL file used as PGlite initialisation SQL when `sqlContent`
+	 *  is not provided in the request.  Falls back to `PGLITE_INIT_SQL_FILE`
+	 *  environment variable when omitted. */
+	pgliteInitSqlFile?: string;
+}
+
+export function createControllers(options: CreateControllersOptions = {}) {
+	const pgliteInitSqlFile =
+		options.pgliteInitSqlFile ?? process.env.PGLITE_INIT_SQL_FILE;
+
 	const databaseAnalyzer = new DatabaseAnalyzer();
-	const connectionController = new DatabaseController(databaseAnalyzer);
+	const databaseService = new DatabaseService(
+		databaseAnalyzer,
+		pgliteInitSqlFile,
+	);
+	const connectionController = new DatabaseController(
+		databaseAnalyzer,
+		databaseService,
+	);
 
 	const selectQueryGenerator = new SQLQueryGenerationService(
 		new SelectQueryGenerationDirector(),
@@ -39,6 +57,7 @@ export function createControllers() {
 	const taskGenerationController = new TaskGenerationController(
 		selectQueryGenerator,
 		taskDescriptionGenerationService,
+		databaseService,
 	);
 
 	// ── Grading dependencies ──────────────────────────────────────────────────
@@ -65,14 +84,18 @@ export function createControllers() {
 		resultSetComparator,
 		astComparator,
 		executionPlanComparator,
+		undefined,
+		databaseService,
 	);
 
 	const descriptionController = new DescriptionController(
 		taskDescriptionGenerationService,
+		databaseService,
 	);
 	const queryExecutionService = new QueryExecutionService();
 	const queryExecutionController = new QueryExecutionController(
 		queryExecutionService,
+		databaseService,
 	);
 
 	return {
