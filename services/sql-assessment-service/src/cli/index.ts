@@ -118,7 +118,7 @@ async function main() {
 
 	const result = await invokeHandler(route.handler, body);
 	console.log(JSON.stringify(result.data, null, 2));
-	if (result.statusCode >= 400) process.exit(1);
+	process.exit(result.statusCode >= 400 ? 1 : 0);
 }
 
 main().catch((err) => {

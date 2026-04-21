@@ -31,6 +31,8 @@ set -euo pipefail
 
 BASE_URL="${1:-${BASE_URL:-http://localhost:3000}}"
 PGLITE_DB_ID="${PGLITE_DB_ID:-smoke-db}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLI_PATH="$(dirname "$SCRIPT_DIR")/build/cli/index.js"
 
 PASS=0
 FAIL=0
@@ -91,6 +93,49 @@ post_body_contains() {
             red   "         body: $http_body"
             (( FAIL++ )) || true
         fi
+    fi
+}
+
+# Runs the CLI in-process; checks exit code.
+# Usage: cli_invoke LABEL EXPECTED_EXIT [CLI_ARGS...]
+cli_invoke() {
+    local label="$1" expected_exit="$2"
+    shift 2
+    local output exit_code=0
+    output=$(node "$CLI_PATH" "$@" 2>&1) || exit_code=$?
+    if [[ "$exit_code" -eq "$expected_exit" ]]; then
+        green "  PASS  [exit=$exit_code] $label"
+        (( PASS++ )) || true
+    else
+        red   "  FAIL  [exit=$exit_code != $expected_exit] $label"
+        red   "         output: $output"
+        (( FAIL++ )) || true
+    fi
+}
+
+# Like cli_invoke but also asserts that output contains NEEDLE.
+# Usage: cli_invoke_contains LABEL EXPECTED_EXIT NEEDLE [CLI_ARGS...]
+cli_invoke_contains() {
+    local label="$1" expected_exit="$2" needle="$3"
+    shift 3
+    local output exit_code=0
+    output=$(node "$CLI_PATH" "$@" 2>&1) || exit_code=$?
+    if [[ "$exit_code" -eq "$expected_exit" ]]; then
+        green "  PASS  [exit=$exit_code] $label"
+        (( PASS++ )) || true
+    else
+        red   "  FAIL  [exit=$exit_code != $expected_exit] $label"
+        red   "         output: $output"
+        (( FAIL++ )) || true
+        return
+    fi
+    if echo "$output" | grep -q "$needle"; then
+        green "  PASS  output contains \"$needle\""
+        (( PASS++ )) || true
+    else
+        red   "  FAIL  output does not contain \"$needle\""
+        red   "         output: $output"
+        (( FAIL++ )) || true
     fi
 }
 
@@ -230,6 +275,124 @@ pglite_init_sql_file_tests() {
             '{connectionInfo:{type:"pglite",databaseId:$id}}')" 
 }
 
+# ---- CLI tests ------------------------------------------------------------
+
+cli_tests() {
+    echo ""
+    echo "── CLI tests (build/cli/index.js) ──────────────────────────────────────"
+
+    if [[ ! -f "$CLI_PATH" ]]; then
+        red "  SKIP  CLI binary not found at ${CLI_PATH} — run 'npm run build'"
+        return
+    fi
+
+    local CLI_DB_ID="cli-smoke-db"
+
+    local DDL
+    DDL='CREATE TABLE products (id SERIAL PRIMARY KEY, name TEXT NOT NULL, price NUMERIC(10,2));
+CREATE TABLE orders (id SERIAL PRIMARY KEY, product_id INTEGER REFERENCES products(id), quantity INTEGER NOT NULL);
+INSERT INTO products (name, price) VALUES ('\''Widget'\'', 9.99), ('\''Gadget'\'', 19.99);
+INSERT INTO orders (product_id, quantity) VALUES (1, 5), (2, 3);'
+
+    local DDL_PRODUCTS_ONLY
+    DDL_PRODUCTS_ONLY='CREATE TABLE products (id SERIAL PRIMARY KEY, name TEXT NOT NULL, price NUMERIC(10,2));
+INSERT INTO products (name, price) VALUES ('\''Widget'\'', 9.99), ('\''Gadget'\'', 19.99);'
+
+    # 1. --list shows available commands
+    cli_invoke_contains "--list shows commands" 0 "database:analyze-database" \
+        --list
+
+    # 2. --help shows usage text
+    cli_invoke_contains "--help shows usage" 0 "Usage:" \
+        --help
+
+    # 3. Unknown command → exit 1
+    cli_invoke "unknown command (→ exit 1)" 1 \
+        no:such:command '{"foo":"bar"}'
+
+    # 4. analyze-database — valid DDL via inline JSON arg
+    cli_invoke "database:analyze-database — valid DDL" 0 \
+        database:analyze-database \
+        "$(jq -n --arg id "$CLI_DB_ID" --arg sql "$DDL" \
+            '{connectionInfo:{type:"pglite",databaseId:$id,sqlContent:$sql}}')"
+
+    # 5. query:execute — SELECT * (sqlContent provided inline so process is self-contained)
+    cli_invoke_contains "query:execute — SELECT * FROM products" 0 "Widget" \
+        query:execute \
+        "$(jq -n --arg id "$CLI_DB_ID" --arg sql "$DDL_PRODUCTS_ONLY" \
+            '{connectionInfo:{type:"pglite",databaseId:$id,sqlContent:$sql},query:"SELECT * FROM products ORDER BY id"}')"
+
+    # 6. query:execute — JOIN (both tables in sqlContent)
+    cli_invoke "query:execute — JOIN products + orders" 0 \
+        query:execute \
+        "$(jq -n --arg id "$CLI_DB_ID" --arg sql "$DDL" \
+            '{connectionInfo:{type:"pglite",databaseId:$id,sqlContent:$sql},query:"SELECT p.name, o.quantity FROM products p JOIN orders o ON p.id = o.product_id ORDER BY p.id"}')"
+
+    # 7. INSERT rejected → exit 1
+    cli_invoke "query:execute — INSERT (NON_SELECT → exit 1)" 1 \
+        query:execute \
+        "$(jq -n --arg id "$CLI_DB_ID" --arg sql "$DDL_PRODUCTS_ONLY" --arg q "INSERT INTO products (name, price) VALUES ('X', 1.0)" \
+            '{connectionInfo:{type:"pglite",databaseId:$id,sqlContent:$sql},query:$q}')"
+
+    # 8. Unknown table → exit 1
+    cli_invoke "query:execute — unknown table (→ exit 1)" 1 \
+        query:execute \
+        "$(jq -n --arg id "$CLI_DB_ID" --arg sql "$DDL_PRODUCTS_ONLY" \
+            '{connectionInfo:{type:"pglite",databaseId:$id,sqlContent:$sql},query:"SELECT * FROM no_such_table"}')"
+
+    # 9. Body via stdin pipe (auto-detected when stdin is not a TTY)
+    local stdin_body stdin_out stdin_exit=0
+    stdin_body=$(jq -n --arg id "$CLI_DB_ID" --arg sql "$DDL_PRODUCTS_ONLY" \
+        '{connectionInfo:{type:"pglite",databaseId:$id,sqlContent:$sql},query:"SELECT name FROM products WHERE price > 15 ORDER BY id"}')
+    stdin_out=$(echo "$stdin_body" | node "$CLI_PATH" query:execute 2>&1) || stdin_exit=$?
+    if [[ "$stdin_exit" -eq 0 ]]; then
+        green "  PASS  [exit=0] query:execute — body via stdin pipe"
+        (( PASS++ )) || true
+        if echo "$stdin_out" | grep -q "Gadget"; then
+            green "  PASS  output contains \"Gadget\""
+            (( PASS++ )) || true
+        else
+            red   "  FAIL  output does not contain \"Gadget\""
+            red   "         output: $stdin_out"
+            (( FAIL++ )) || true
+        fi
+    else
+        red   "  FAIL  [exit=$stdin_exit != 0] query:execute — body via stdin pipe"
+        red   "         output: $stdin_out"
+        (( FAIL++ )) || true
+    fi
+
+    # 10. Body via -f file
+    local tmp_body
+    tmp_body=$(mktemp /tmp/cli-smoke-XXXXXX.json)
+    jq -n --arg id "$CLI_DB_ID" --arg sql "$DDL_PRODUCTS_ONLY" \
+        '{connectionInfo:{type:"pglite",databaseId:$id,sqlContent:$sql},query:"SELECT COUNT(*) AS cnt FROM products"}' \
+        > "$tmp_body"
+    cli_invoke_contains "query:execute — body via -f file" 0 "cnt" \
+        query:execute -f "$tmp_body"
+    rm -f "$tmp_body"
+
+    # 11. Missing databaseId → exit 1
+    cli_invoke "database:analyze-database — missing databaseId (→ exit 1)" 1 \
+        database:analyze-database \
+        '{"connectionInfo":{"type":"pglite","sqlContent":"SELECT 1"}}'
+
+    # 12. --init-sql-file flag: command must come first, flag comes after the JSON body
+    if [[ -n "${SMOKE_TEST_INIT_SQL:-}" && -n "${PGLITE_INIT_SQL_FILE:-}" ]]; then
+        local INIT_TABLE="${SMOKE_INIT_SQL_TABLE:-products}"
+        local FRESH_DB="cli-init-${RANDOM}"
+        local INIT_QUERY="SELECT * FROM ${INIT_TABLE} LIMIT 1"
+        cli_invoke_contains \
+            "query:execute — --init-sql-file, query table from init file" 0 "rows" \
+            query:execute \
+            "$(jq -n --arg id "$FRESH_DB" --arg q "$INIT_QUERY" \
+                '{connectionInfo:{type:"pglite",databaseId:$id},query:$q}')" \
+            --init-sql-file "$PGLITE_INIT_SQL_FILE"
+    elif [[ -n "${SMOKE_TEST_INIT_SQL:-}" ]]; then
+        echo "  SKIP  CLI --init-sql-file test (set PGLITE_INIT_SQL_FILE to enable)"
+    fi
+}
+
 # ---- PostgreSQL tests (optional) -------------------------------------------
 
 postgres_tests() {
@@ -299,6 +462,7 @@ echo " OK"
 pglite_tests
 pglite_init_sql_file_tests
 postgres_tests
+cli_tests
 
 echo ""
 echo "────────────────────────────────────────────────"
