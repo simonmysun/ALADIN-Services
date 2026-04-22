@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { DatabaseAnalyzer } from './database-analyzer';
 import {
@@ -35,6 +35,7 @@ export interface AnalyzeResult {
  */
 export class DatabaseService {
 	private readonly initSqlFilePath?: string;
+	private cachedInitSql?: string;
 
 	constructor(
 		private readonly databaseAnalyzer: DatabaseAnalyzer,
@@ -91,7 +92,10 @@ export class DatabaseService {
 				// Fall back to the configured init-SQL file (if any).
 				if (this.initSqlFilePath) {
 					try {
-						sqlContent = fs.readFileSync(this.initSqlFilePath, 'utf-8');
+						if (!this.cachedInitSql) {
+							this.cachedInitSql = await fs.readFile(this.initSqlFilePath, 'utf-8');
+						}
+						sqlContent = this.cachedInitSql;
 					} catch (err) {
 						console.error(
 							`Failed to read init SQL file: ${this.initSqlFilePath}`,
