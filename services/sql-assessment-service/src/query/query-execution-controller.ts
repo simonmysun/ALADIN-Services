@@ -216,7 +216,6 @@ export class QueryExecutionController {
 	// -------------------------------------------------------------------------
 
 	private async executeQueryOnPGlite(
-		 
 		connectionInfo: any,
 		query: string,
 		lang: SupportedLanguage,
