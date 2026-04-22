@@ -25,7 +25,7 @@ import {
 	DEFAULT_RELATIONSHIP_LABEL,
 } from '../neo4j/constants';
 import { sanitizeIdentifier } from '../neo4j/cypher/utils';
-import { createParameterUuid } from '../../../utils/uuid';
+import { createNodeUuid, createParameterUuid } from '../../../utils/uuid';
 
 export class InMemoryGraphService implements IGraphDB {
 	private readonly db = GrafeoDB.create();
@@ -60,7 +60,7 @@ export class InMemoryGraphService implements IGraphDB {
 		metadata: DBGraphNodeMetadata,
 		internalId?: DBGraphNodeInternalId
 	): Promise<DBGraphNodeResult> {
-		const key = internalId ?? '';
+		const key = internalId ?? createNodeUuid();
 		const attrs = { ...metadata };
 		delete attrs._grs_internalId;
 		const storedAttrs = { ...attrs, _grs_internalId: key };
