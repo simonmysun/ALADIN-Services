@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { DatabaseAnalyzer } from './database-analyzer';
 import { DatabaseService } from './database-service';
-import { resolveLanguageCode } from '../shared/i18n';
+import { t, resolveLanguageCode } from '../shared/i18n';
 import { IAliasMap } from '../shared/interfaces/domain';
 
 /**
@@ -69,7 +69,7 @@ export class DatabaseController {
 
 		const connectionInfo = req.body?.connectionInfo;
 		if (!connectionInfo) {
-			return res.status(400).json({ message: 'Invalid connection info' });
+			return res.status(400).json({ message: t('MISSING_CONNECTION_INFO', lang) });
 		}
 
 		// Parse and validate the optional alias map
