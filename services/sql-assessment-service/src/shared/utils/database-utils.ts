@@ -6,7 +6,7 @@ export function generateDatabaseKey(
 	port: number,
 	schema: string,
 ): string {
-	return `${host}${port}${schema}`;
+	return `${host}:${port}/${schema}`;
 }
 
 export function generatePGliteKey(databaseId: string): string {
