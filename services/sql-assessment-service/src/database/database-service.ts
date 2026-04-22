@@ -59,7 +59,6 @@ export class DatabaseService {
 	 *   skip the expensive round-trip.
 	 */
 	async ensureAnalyzed(
-		 
 		connectionInfo: any,
 		aliasMap?: IAliasMap,
 		lang: SupportedLanguage = 'en',
@@ -93,7 +92,10 @@ export class DatabaseService {
 				if (this.initSqlFilePath) {
 					try {
 						if (!this.cachedInitSql) {
-							this.cachedInitSql = await fs.readFile(this.initSqlFilePath, 'utf-8');
+							this.cachedInitSql = await fs.readFile(
+								this.initSqlFilePath,
+								'utf-8',
+							);
 						}
 						sqlContent = this.cachedInitSql;
 					} catch (err) {
@@ -145,7 +147,6 @@ export class DatabaseService {
 	// -------------------------------------------------------------------------
 
 	private async analyzePGlite(
-		 
 		rawInfo: any,
 		lang: SupportedLanguage,
 	): Promise<AnalyzeResult> {
