@@ -50,7 +50,6 @@ export class DatabaseAnalyzer {
 	 * @param aliasMap - Optional human-readable alias map.
 	 */
 	public async extractSchemaFromPGlite(
-		 
 		db: any,
 		key: string,
 		aliasMap?: IAliasMap,
