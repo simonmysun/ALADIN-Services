@@ -73,7 +73,6 @@ export class QueryExecutionService {
 	 */
 	public async executeQueryOnPGlite(
 		query: string,
-		 
 		db: any,
 		lang: SupportedLanguage = 'en',
 	): Promise<QueryExecutionResult> {
