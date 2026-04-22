@@ -1,6 +1,6 @@
 # sql-query-generation
 
-To use this application add a .env file in the root level with the following key: `API_KEY={Add  OpenAI key here}`
+To use this application add a .env file in the root level with the following key: `OPENAI_API_KEY={Add OpenAI key here}`
 
 Run the application with the command: `npx ts-node src/index.ts`
 
@@ -14,7 +14,7 @@ docker build -t sql-assessment-service .
 docker run -p 3000:3000 sql-assessment-service
 
 # Run with OpenAI key
-docker run -p 3000:3000 -e API_KEY=sk-... sql-assessment-service
+docker run -p 3000:3000 -e OPENAI_API_KEY=sk-... sql-assessment-service
 ```
 
 PGlite works out of the box inside the container — no external database required. The `@electric-sql/pglite` package (including its WASM binary) is copied into the image separately from the bundle because esbuild cannot inline WASM files.
