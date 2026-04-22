@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { PGlite } from '@electric-sql/pglite';
 import { DatabaseAnalyzer } from '../../src/database/database-analyzer';
 import { DatabaseService } from '../../src/database/database-service';
 import {
@@ -28,6 +29,13 @@ const DB_KEY = generatePGliteKey(DB_ID);
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+// Warm up PGlite WASM once per worker thread so individual tests don't pay
+// the cold-start cost and hit the default 5 s timeout in CI.
+beforeAll(async () => {
+	const db = new PGlite();
+	await db.close();
+});
 
 describe('DatabaseService — ensureAnalyzed', () => {
 	let service: DatabaseService;

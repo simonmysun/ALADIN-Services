@@ -1,4 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+	describe,
+	it,
+	expect,
+	beforeAll,
+	beforeEach,
+	afterEach,
+	vi,
+} from 'vitest';
+import { PGlite } from '@electric-sql/pglite';
 import type { Request, Response } from 'express';
 import { DatabaseController } from '../../src/database/database-controller';
 import { DatabaseAnalyzer } from '../../src/database/database-analyzer';
@@ -50,6 +59,13 @@ function mockRes() {
 	const status = vi.fn().mockReturnValue({ json });
 	return { res: { status, json } as unknown as Response, status, json };
 }
+
+// Warm up PGlite WASM once per worker thread so individual tests don't pay
+// the cold-start cost and hit the default timeout in CI.
+beforeAll(async () => {
+	const db = new PGlite();
+	await db.close();
+});
 
 // ---------------------------------------------------------------------------
 // Tests
