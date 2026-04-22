@@ -15,18 +15,24 @@ COPY src/ ./src/
 RUN npm run build
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
-# Lightweight runtime using bundled JavaScript only.
-# Neo4j is deployed as a separate service (configured via environment variables).
-FROM node:22-alpine
+# @grafeo-db/js ships a native Rust addon compiled against glibc (gnu).
+# Using node:22-slim (Debian/glibc) keeps the same libc as the builder so the
+# native binding works.  node:22-alpine (musl) would require the -musl variant.
+FROM node:22-slim
 
 WORKDIR /app
 
 # Copy bundled app output from builder
 COPY --from=builder /build/dist ./dist
 
+# @grafeo-db/js ships a native Rust addon (.node file) that cannot be bundled
+# by esbuild and is therefore externalized.  Copy the packages so both the
+# in-memory and neo4j backends are available at runtime.
+COPY --from=builder /build/node_modules/@grafeo-db ./node_modules/@grafeo-db
+
 # ── Environment defaults ───────────────────────────────────────────────────────
-# Neo4j connection is configured via environment variables.
-# When using docker-compose, these will be set from the Neo4j service name.
+# DB_BACKEND defaults to "memory" (no external DB needed).
+# Set DB_BACKEND=neo4j to use Neo4j; configure the connection below.
 ENV APP_ENV=production \
     NODE_ENV=production \
     NEO4J_URI=bolt://neo4j:7687 \

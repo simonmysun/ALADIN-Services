@@ -16,7 +16,7 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-BASE_URL="${1:-${BASE_URL:-http://localhost:8080}}"
+BASE_URL="${1:-${BASE_URL:-http://127.0.0.1:8080}}"
 
 PASS=0
 FAIL=0
@@ -250,27 +250,54 @@ run_api_tests() {
 memory_tests() {
     echo ""
     echo "══════════════════════════════════════════════════════════════════════"
-    echo "  Testing IN-MEMORY backend (no Neo4j)"
+    echo "  Testing IN-MEMORY backend (container)"
     echo "══════════════════════════════════════════════════════════════════════"
 
-    # Start server with memory backend
-    DB_BACKEND=memory APP_ENV=production node dist/index.js &
-    local SERVER_PID=$!
-    trap "kill $SERVER_PID 2>/dev/null || true" RETURN
+    local CONTAINER_NAME="grs-smoke-memory"
+    local IMAGE_NAME="graph-rewriting-service:smoke-test"
+
+    # Build Docker image (includes its own npm run build via builder stage)
+    echo "  Building Docker image..."
+    if ! docker build -t "$IMAGE_NAME" . >/dev/null 2>&1; then
+        red "  FAIL  Docker image build failed"
+        (( FAIL++ )) || true
+        return
+    fi
+    echo "  Docker image built."
+
+    # Remove any leftover container from a previous interrupted run
+    docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+
+    # Free port 8080 if something else is already bound to it
+    local occupant
+    occupant=$(docker ps -q --filter "publish=8080" 2>/dev/null)
+    if [[ -n "$occupant" ]]; then
+        echo "  Removing container occupying port 8080 ($occupant)..."
+        docker rm -f "$occupant" >/dev/null 2>&1 || true
+        sleep 1
+    fi
+
+    # Start container with memory backend (default, but explicit for clarity)
+    docker run -d --name "$CONTAINER_NAME" \
+        -p 8080:8080 \
+        -e DB_BACKEND=memory \
+        "$IMAGE_NAME" >/dev/null
+
+    trap "docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true" RETURN
 
     if ! wait_for_service "$BASE_URL"; then
-        red "  FAIL  Server did not start (memory backend)"
+        red "  FAIL  Container did not start (memory backend)"
         (( FAIL++ )) || true
-        kill "$SERVER_PID" 2>/dev/null || true
+        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
         return
     fi
 
-    run_api_tests "memory"
+    run_api_tests "memory (container)"
 
     # Memory-specific health check
     get "memory health" "200" "${BASE_URL}/memory/health"
 
-    kill "$SERVER_PID" 2>/dev/null || true
+    docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
     sleep 1
 }
 
