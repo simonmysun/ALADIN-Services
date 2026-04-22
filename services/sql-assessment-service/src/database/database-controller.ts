@@ -69,7 +69,9 @@ export class DatabaseController {
 
 		const connectionInfo = req.body?.connectionInfo;
 		if (!connectionInfo) {
-			return res.status(400).json({ message: t('MISSING_CONNECTION_INFO', lang) });
+			return res
+				.status(400)
+				.json({ message: t('MISSING_CONNECTION_INFO', lang) });
 		}
 
 		// Parse and validate the optional alias map

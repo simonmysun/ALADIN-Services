@@ -100,7 +100,7 @@ export class DatabaseService {
 						return {
 							ok: false,
 							status: 500,
-							message: `Cannot read init SQL file: ${this.initSqlFilePath}`,
+							message: t('INIT_SQL_READ_ERROR', lang),
 						};
 					}
 				}

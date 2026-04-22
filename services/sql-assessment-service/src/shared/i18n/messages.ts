@@ -23,6 +23,7 @@ export type MessageKey =
 	// ── database controller ──────────────────────────────────────────────────
 	| 'DATABASE_ANALYSIS_SUCCESS'
 	| 'DATABASE_SCHEMA_EXTRACTION_FAILED'
+	| 'INIT_SQL_READ_ERROR'
 	// ── query execution ──────────────────────────────────────────────────────
 	| 'MISSING_OR_EMPTY_QUERY'
 	| 'QUERY_EMPTY'
@@ -132,6 +133,8 @@ export const MESSAGES: MessageCatalogue = {
 		// database controller
 		DATABASE_ANALYSIS_SUCCESS: 'Connection successful.',
 		DATABASE_SCHEMA_EXTRACTION_FAILED: 'Unable to extract database schema.',
+		INIT_SQL_READ_ERROR: 'Failed to read the database initialization script.',
+
 		// query execution
 		MISSING_OR_EMPTY_QUERY: 'Missing or empty query string.',
 		QUERY_EMPTY: 'Query must not be empty.',
@@ -268,6 +271,9 @@ export const MESSAGES: MessageCatalogue = {
 		DATABASE_ANALYSIS_SUCCESS: 'Verbindung erfolgreich.',
 		DATABASE_SCHEMA_EXTRACTION_FAILED:
 			'Das Datenbankschema konnte nicht extrahiert werden.',
+		INIT_SQL_READ_ERROR:
+			'Das Initialisierungsskript der Datenbank konnte nicht gelesen werden.',
+
 		// query execution
 		MISSING_OR_EMPTY_QUERY: 'Abfragezeichenkette fehlt oder ist leer.',
 		QUERY_EMPTY: 'Die Abfrage darf nicht leer sein.',
