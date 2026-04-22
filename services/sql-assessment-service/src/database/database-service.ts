@@ -123,10 +123,17 @@ export class DatabaseService {
 			return this.analyzePGlite({ ...connectionInfo, sqlContent }, lang);
 		}
 
-		// PostgreSQL – skip if already registered to avoid redundant round-trips.
-		const { host, port, schema } = connectionInfo as PostgresConnectionOptions;
-		const key = generateDatabaseKey(host!, port!, schema!);
-		if (isDatabaseRegistered(key)) {
+		// PostgreSQL – validate first so we never generate a bogus key from undefined fields.
+		const pgInfo = connectionInfo as PostgresConnectionOptions;
+		const pgValidationError = validateConnectionInfo(pgInfo, lang);
+		if (pgValidationError) {
+			return { ok: false, status: 400, message: pgValidationError };
+		}
+
+		// Skip the expensive round-trip only when the caller did not explicitly
+		// require a fresh analysis (required=true is used by /analyze-database).
+		const key = generateDatabaseKey(pgInfo.host!, pgInfo.port!, pgInfo.schema!);
+		if (!required && isDatabaseRegistered(key)) {
 			return { ok: true, status: 200, message: 'already registered' };
 		}
 
