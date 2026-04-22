@@ -13,6 +13,8 @@ const sharedOptions = {
 	minify: true,
 	platform: 'node',
 	target: 'node22',
+	// @grafeo-db/js ships a native Rust addon (.node file) that esbuild cannot bundle
+	external: ['@grafeo-db/js', '@grafeo-db/js-linux-x64-gnu', '@grafeo-db/js-linux-arm64-gnu'],
 };
 
 await rm(distDir, { force: true, recursive: true });

@@ -1,3 +1,4 @@
+import { GrafeoDB } from '@grafeo-db/js';
 import {
 	DBGraphEdgeInternalId,
 	DBGraphNodeInternalId,
@@ -14,36 +15,62 @@ import {
 	DBGraphEdge,
 } from '../types';
 import { PatternNodeSchema } from '../../../types/patternnode.schema';
-
-interface StoredNode {
-	key: DBGraphNodeInternalId;
-	attributes: DBGraphNodeMetadata;
-}
-
-interface StoredEdge {
-	key: DBGraphEdgeInternalId;
-	source: DBGraphNodeInternalId;
-	target: DBGraphNodeInternalId;
-	attributes: DBGraphEdgeMetadata;
-}
+import {
+	computeEdgeQuery,
+	computeInjectivityClause,
+	computeNodeQuery,
+} from '../neo4j/cypher/rewrite';
+import {
+	DEFAULT_NODE_LABEL,
+	DEFAULT_RELATIONSHIP_LABEL,
+} from '../neo4j/constants';
+import { sanitizeIdentifier } from '../neo4j/cypher/utils';
+import { createParameterUuid } from '../../../utils/uuid';
 
 export class InMemoryGraphService implements IGraphDB {
-	private nodes = new Map<string, StoredNode>();
-	private edges = new Map<string, StoredEdge>();
+	private readonly db = GrafeoDB.create();
+	/** Supplemental edge index — grafeo doesn't support WHERE on relationship properties */
+	private readonly edgeStore = new Map<string, DBGraphEdgeResult>();
 
 	public graphType: DBGraphType = 'undirected';
+
+	// ---------- helpers ----------
+
+	private propsToNodeResult(props: Record<string, unknown>): DBGraphNodeResult {
+		const key = props._grs_internalId as string;
+		const attributes = { ...props };
+		delete attributes._grs_internalId;
+		return { key, attributes };
+	}
+
+	private propsToEdgeResult(props: Record<string, unknown>): DBGraphEdgeResult {
+		const key = props._grs_internalId as string;
+		const source = props._grs_source as string;
+		const target = props._grs_target as string;
+		const attributes = { ...props };
+		delete attributes._grs_internalId;
+		delete attributes._grs_source;
+		delete attributes._grs_target;
+		return { key, source, target, attributes };
+	}
+
+	// ---------- Node CRUD ----------
 
 	public async createNode(
 		metadata: DBGraphNodeMetadata,
 		internalId?: DBGraphNodeInternalId
 	): Promise<DBGraphNodeResult> {
 		const key = internalId ?? '';
-		const attributes = { ...metadata };
-		delete attributes._grs_internalId;
+		const attrs = { ...metadata };
+		delete attrs._grs_internalId;
+		const storedAttrs = { ...attrs, _grs_internalId: key };
 
-		this.nodes.set(key, { key, attributes });
+		await this.db.executeCypher(
+			`CREATE (n:\`${DEFAULT_NODE_LABEL}\`) SET n = $nodeMetadata`,
+			{ nodeMetadata: storedAttrs }
+		);
 
-		return { key, attributes: { ...attributes } };
+		return { key, attributes: attrs };
 	}
 
 	public async updateNode(
@@ -59,60 +86,58 @@ export class InMemoryGraphService implements IGraphDB {
 			);
 		}
 
-		const existing = this.nodes.get(internalId);
-		if (!existing) {
-			throw new Error(
-				`InMemoryGraphService: node with id ${internalId} not found`
+		const attrs = { ...metadata };
+		delete attrs._grs_internalId;
+		const mode = options?.attributeReplacementMode;
+
+		if (mode === 'delete') {
+			await this.db.executeCypher(
+				`MATCH (n) WHERE n._grs_internalId = $internalId SET n = $metadata`,
+				{ internalId, metadata: { _grs_internalId: internalId } }
 			);
+			return { key: internalId, attributes: {} };
+		} else if (mode === 'replace') {
+			await this.db.executeCypher(
+				`MATCH (n) WHERE n._grs_internalId = $internalId SET n = $metadata`,
+				{ internalId, metadata: { ...attrs, _grs_internalId: internalId } }
+			);
+			return { key: internalId, attributes: attrs };
+		} else {
+			await this.db.executeCypher(
+				`MATCH (n) WHERE n._grs_internalId = $internalId SET n += $metadata`,
+				{ internalId, metadata: { ...attrs, _grs_internalId: internalId } }
+			);
+			return (await this.getNode(internalId))!;
 		}
-
-		let newAttributes: DBGraphNodeMetadata;
-		const replacementMode = options?.attributeReplacementMode;
-
-		switch (replacementMode) {
-			case 'delete':
-				newAttributes = {};
-				break;
-			case 'replace':
-				newAttributes = { ...metadata };
-				break;
-			case 'modify':
-			default:
-				newAttributes = { ...existing.attributes, ...metadata };
-				break;
-		}
-
-		delete newAttributes._grs_internalId;
-
-		this.nodes.set(internalId, { key: internalId, attributes: newAttributes });
-
-		return { key: internalId, attributes: { ...newAttributes } };
 	}
 
 	public async getNode(
 		internalId: DBGraphNodeInternalId
 	): Promise<DBGraphNodeResult | undefined> {
-		const node = this.nodes.get(internalId);
-		if (!node) return undefined;
-		return { key: node.key, attributes: { ...node.attributes } };
+		const result = await this.db.executeCypher(
+			`MATCH (n) WHERE n._grs_internalId = $internalId RETURN properties(n) AS props`,
+			{ internalId }
+		);
+		const rows = result.toArray();
+		if (!rows.length) return undefined;
+		return this.propsToNodeResult(rows[0].props as Record<string, unknown>);
 	}
 
 	public async deleteNode(
 		internalId: DBGraphNodeInternalId
 	): Promise<DBGraphNodeResult | undefined> {
-		const node = this.nodes.get(internalId);
-
-		// Detach delete: remove all connected edges
-		for (const [edgeId, edge] of this.edges) {
+		const node = await this.getNode(internalId);
+		// Remove edges connected to this node from the supplemental store
+		for (const [id, edge] of this.edgeStore) {
 			if (edge.source === internalId || edge.target === internalId) {
-				this.edges.delete(edgeId);
+				this.edgeStore.delete(id);
 			}
 		}
-
-		this.nodes.delete(internalId);
-
-		if (!node) return undefined;
-		return { key: node.key, attributes: { ...node.attributes } };
+		await this.db.executeCypher(
+			`MATCH (n) WHERE n._grs_internalId = $internalId DETACH DELETE n`,
+			{ internalId }
+		);
+		return node;
 	}
 
 	public async deleteNodes(
@@ -120,25 +145,31 @@ export class InMemoryGraphService implements IGraphDB {
 	): Promise<DBGraphNodeResult[] | undefined> {
 		const results: DBGraphNodeResult[] = [];
 		for (const id of internalIds) {
-			const result = await this.deleteNode(id);
-			if (result) results.push(result);
+			const r = await this.deleteNode(id);
+			if (r) results.push(r);
 		}
 		return results.length ? results : undefined;
 	}
 
 	public async getAllNodes(): Promise<DBGraphNodeResult[]> {
-		return Array.from(this.nodes.values()).map((node) => ({
-			key: node.key,
-			attributes: { ...node.attributes },
-		}));
+		const result = await this.db.executeCypher(
+			`MATCH (n:\`${DEFAULT_NODE_LABEL}\`) RETURN properties(n) AS props`
+		);
+		return result
+			.toArray()
+			.map((row) =>
+				this.propsToNodeResult(row.props as Record<string, unknown>)
+			);
 	}
 
 	public async deleteAllNodes(): Promise<DBGraphNodeResult[]> {
 		const all = await this.getAllNodes();
-		this.nodes.clear();
-		this.edges.clear();
+		this.edgeStore.clear();
+		await this.db.executeCypher(`MATCH (n) DETACH DELETE n`);
 		return all;
 	}
+
+	// ---------- Edge CRUD ----------
 
 	public async createEdge(
 		internalIdSource: DBGraphNodeInternalId,
@@ -146,23 +177,26 @@ export class InMemoryGraphService implements IGraphDB {
 		internalId: DBGraphEdgeInternalId,
 		metadata: DBGraphEdgeMetadata
 	): Promise<DBGraphEdgeResult> {
-		const attributes = { ...metadata };
+		const storedAttrs = {
+			...metadata,
+			_grs_internalId: internalId,
+			_grs_source: internalIdSource,
+			_grs_target: internalIdTarget,
+		};
 
-		const edge: StoredEdge = {
+		await this.db.executeCypher(
+			`MATCH (a:\`${DEFAULT_NODE_LABEL}\`), (b:\`${DEFAULT_NODE_LABEL}\`) WHERE a._grs_internalId = $src AND b._grs_internalId = $tgt CREATE (a)-[r:\`${DEFAULT_RELATIONSHIP_LABEL}\`]->(b) SET r = $attrs`,
+			{ src: internalIdSource, tgt: internalIdTarget, attrs: storedAttrs }
+		);
+
+		const edge: DBGraphEdgeResult = {
 			key: internalId,
 			source: internalIdSource,
 			target: internalIdTarget,
-			attributes,
+			attributes: { ...metadata },
 		};
-
-		this.edges.set(internalId, edge);
-
-		return {
-			key: internalId,
-			source: internalIdSource,
-			target: internalIdTarget,
-			attributes: { ...attributes },
-		};
+		this.edgeStore.set(internalId, edge);
+		return edge;
 	}
 
 	public async updateEdge(
@@ -178,66 +212,73 @@ export class InMemoryGraphService implements IGraphDB {
 			);
 		}
 
-		const oldEdge = this.edges.get(internalId);
+		const oldEdge = this.edgeStore.get(internalId);
+		await this.deleteEdge(internalId);
 
-		let attributes: DBGraphEdgeMetadata = {};
+		let attrs: DBGraphEdgeMetadata = {};
+		const mode = options?.attributeReplacementMode;
 
-		const replacementMode = options?.attributeReplacementMode;
-		switch (replacementMode) {
-			case 'delete':
-				break;
-			case 'replace':
-				attributes = { ...metadata };
-				break;
-			case 'modify':
-			default:
-				if (oldEdge) {
-					attributes = { ...oldEdge.attributes, ...metadata };
-				} else {
-					attributes = { ...metadata };
-				}
-				break;
+		if (mode === 'delete') {
+			attrs = {};
+		} else if (mode === 'replace') {
+			attrs = { ...metadata };
+		} else {
+			attrs = oldEdge
+				? { ...oldEdge.attributes, ...metadata }
+				: { ...metadata };
 		}
-
-		this.edges.delete(internalId);
 
 		return this.createEdge(
 			internalIdSource,
 			internalIdTarget,
 			internalId,
-			attributes
+			attrs
 		);
 	}
 
 	public async getEdge(
 		internalId: DBGraphEdgeInternalId
 	): Promise<DBGraphEdgeResult | undefined> {
-		const edge = this.edges.get(internalId);
-		if (!edge) return undefined;
-		return {
-			key: edge.key,
-			source: edge.source,
-			target: edge.target,
-			attributes: { ...edge.attributes },
-		};
+		return this.edgeStore.get(internalId);
 	}
 
 	public async deleteEdge(
 		internalId: DBGraphEdgeInternalId
 	): Promise<DBGraphEdgeResult> {
-		const edge = this.edges.get(internalId);
-		this.edges.delete(internalId);
-
-		if (!edge) {
+		const edge = this.edgeStore.get(internalId);
+		if (!edge)
 			return { key: internalId, source: '', target: '', attributes: {} };
+		this.edgeStore.delete(internalId);
+
+		// Find other edges that share the same src/tgt (multigraph survivors)
+		const survivors = [...this.edgeStore.values()].filter(
+			(e) => e.source === edge.source && e.target === edge.target
+		);
+
+		// Delete ALL relationships between src/tgt (grafeo can't filter by rel property)
+		await this.db.executeCypher(
+			`MATCH (a)-[r:\`${DEFAULT_RELATIONSHIP_LABEL}\`]->(b) WHERE a._grs_internalId = $src AND b._grs_internalId = $tgt DELETE r`,
+			{ src: edge.source, tgt: edge.target }
+		);
+
+		// Recreate the surviving parallel edges
+		for (const survivor of survivors) {
+			await this.db.executeCypher(
+				`MATCH (a:\`${DEFAULT_NODE_LABEL}\`), (b:\`${DEFAULT_NODE_LABEL}\`) WHERE a._grs_internalId = $src AND b._grs_internalId = $tgt CREATE (a)-[r:\`${DEFAULT_RELATIONSHIP_LABEL}\`]->(b) SET r = $attrs`,
+				{
+					src: survivor.source,
+					tgt: survivor.target,
+					attrs: {
+						...survivor.attributes,
+						_grs_internalId: survivor.key,
+						_grs_source: survivor.source,
+						_grs_target: survivor.target,
+					},
+				}
+			);
 		}
 
-		return {
-			key: edge.key,
-			source: edge.source,
-			target: edge.target,
-			attributes: { ...edge.attributes },
-		};
+		return edge;
 	}
 
 	public async deleteEdges(
@@ -251,21 +292,11 @@ export class InMemoryGraphService implements IGraphDB {
 	}
 
 	public async getAllEdges(): Promise<DBGraphEdgeResult[]> {
-		return Array.from(this.edges.values()).map((edge) => ({
-			key: edge.key,
-			source: edge.source,
-			target: edge.target,
-			attributes: { ...edge.attributes },
-		}));
+		return [...this.edgeStore.values()];
 	}
 
-	/**
-	 * In-memory pattern matching implementation.
-	 *
-	 * Uses backtracking to find all subgraph matches of the given pattern
-	 * (nodes + edges) in the current graph, respecting attribute constraints,
-	 * directed/undirected edges, homomorphic/isomorphic matching, and NACs.
-	 */
+	// ---------- Pattern matching ----------
+
 	public async findPatternMatch(
 		nodes: PatternNodeSchema[],
 		edges: DBGraphEdge[],
@@ -273,279 +304,180 @@ export class InMemoryGraphService implements IGraphDB {
 		homo = true,
 		nacs: DBGraphNACs[] = []
 	): Promise<DBGraphPatternMatchResult[] | []> {
-		// Empty pattern → single empty match
 		if (!nodes.length && !edges.length) {
 			return [{ nodes: {}, edges: {} }];
 		}
 
-		const allNodes = Array.from(this.nodes.values());
-		const allEdges = Array.from(this.edges.values());
+		// Edges referencing nodes not in the pattern cannot be resolved
+		const nodeKeySet = new Set(nodes.map((n) => n.key));
+		for (const edge of edges) {
+			if (!nodeKeySet.has(edge.source) || !nodeKeySet.has(edge.target)) {
+				return [];
+			}
+		}
 
-		// Step 1: Find all node assignments via backtracking
-		const nodeBindings = this.findNodeBindings(nodes, allNodes, homo, 0, {});
+		let query = '';
+		let hasWhere = false;
+		let parameters: Record<string, unknown> = {};
+		const whereClauses: string[] = [];
 
-		// Step 2: For each node binding, find matching edge assignments
-		const results: DBGraphPatternMatchResult[] = [];
+		const nodeVars = nodes.map((n) => sanitizeIdentifier(n.key));
+		const edgeVars = edges.map((e) => sanitizeIdentifier(e.key));
 
-		for (const nodeBinding of nodeBindings) {
-			const edgeBindings = this.findEdgeBindings(
-				edges,
-				allEdges,
-				nodeBinding,
-				type,
-				homo,
-				0,
-				{}
+		const nodeQueries: string[] = [];
+		for (const node of nodes) {
+			const { cypher, where, params } = computeNodeQuery(
+				node.key,
+				[DEFAULT_NODE_LABEL],
+				node.attributes ?? {}
 			);
+			if (where) whereClauses.push(where);
+			if (params) parameters = { ...parameters, ...params };
+			nodeQueries.push(cypher);
+		}
+		query += nodeQueries.join(', ');
 
-			for (const edgeBinding of edgeBindings) {
-				// Step 3: Check NACs
-				if (
-					this.checkNACs(nacs, nodeBinding, edgeBinding, allNodes, allEdges)
-				) {
-					const matchResult: DBGraphPatternMatchResult = {
-						nodes: {},
-						edges: {},
-					};
+		const edgeQueries: string[] = [];
+		for (const edge of edges) {
+			const { cypher, where, params } = computeEdgeQuery(
+				edge.key,
+				DEFAULT_RELATIONSHIP_LABEL,
+				edge.attributes,
+				edge.source,
+				edge.target,
+				type === 'directed'
+			);
+			if (where) whereClauses.push(where);
+			if (params) parameters = { ...parameters, ...params };
+			edgeQueries.push(cypher);
+		}
+		if (nodeQueries.length && edgeQueries.length) query += ', ';
+		query += edgeQueries.join(', ');
 
-					for (const [patternKey, storedNode] of Object.entries(nodeBinding)) {
-						matchResult.nodes[patternKey] = {
-							key: storedNode.key,
-							attributes: { ...storedNode.attributes },
-						};
-					}
+		if (!homo) {
+			const nodeInj = computeInjectivityClause(
+				nodes.map((n) => n.key),
+				hasWhere
+			);
+			query += nodeInj.cypher;
+			hasWhere = nodeInj.hasWhere;
+			const edgeInj = computeInjectivityClause(
+				edges.map((e) => e.key),
+				hasWhere
+			);
+			query += edgeInj.cypher;
+			hasWhere = edgeInj.hasWhere;
+		}
 
-					for (const [patternKey, storedEdge] of Object.entries(edgeBinding)) {
-						matchResult.edges[patternKey] = {
-							key: storedEdge.key,
-							source: storedEdge.source,
-							target: storedEdge.target,
-							attributes: { ...storedEdge.attributes },
-						};
-					}
+		if (whereClauses.length) {
+			query += (!hasWhere ? ' WHERE' : ' AND') + whereClauses.join(' AND');
+		}
 
-					results.push(matchResult);
+		const returnParts = [
+			...nodeVars.map((v) => `properties(\`${v}\`) AS \`${v}\``),
+			...edgeVars.map((v) => `properties(\`${v}\`) AS \`${v}\``),
+		];
+		const cypher = `MATCH ${query} RETURN ${returnParts.join(', ')}`;
+
+		const res = await this.db.executeCypher(cypher, parameters);
+		const mainResults = res.toArray().map((row) => {
+			const matchResult: DBGraphPatternMatchResult = { nodes: {}, edges: {} };
+			for (const v of nodeVars) {
+				const props = row[v] as Record<string, unknown> | undefined;
+				if (props) matchResult.nodes[v] = this.propsToNodeResult(props);
+			}
+			for (const v of edgeVars) {
+				const props = row[v] as Record<string, unknown> | undefined;
+				if (props) matchResult.edges[v] = this.propsToEdgeResult(props);
+			}
+			return matchResult;
+		});
+
+		// Apply NACs as post-query filter
+		if (!nacs.length) return mainResults;
+
+		const finalResults: DBGraphPatternMatchResult[] = [];
+		for (const matchResult of mainResults) {
+			let violated = false;
+			for (const nac of nacs) {
+				if (await this.nacMatchExists(nac, matchResult)) {
+					violated = true;
+					break;
 				}
 			}
+			if (!violated) finalResults.push(matchResult);
 		}
-
-		return results;
-	}
-
-	// --- Pattern matching internals ---
-
-	private findNodeBindings(
-		patternNodes: PatternNodeSchema[],
-		allNodes: StoredNode[],
-		homo: boolean,
-		index: number,
-		current: Record<string, StoredNode>
-	): Record<string, StoredNode>[] {
-		if (index >= patternNodes.length) {
-			return [{ ...current }];
-		}
-
-		const patternNode = patternNodes[index];
-		const results: Record<string, StoredNode>[] = [];
-
-		for (const candidate of allNodes) {
-			// Check attribute match
-			if (!this.nodeMatchesPattern(candidate, patternNode)) continue;
-
-			// Isomorphic check: no two pattern nodes map to same host node
-			if (
-				!homo &&
-				Object.values(current).some((bound) => bound.key === candidate.key)
-			) {
-				continue;
-			}
-
-			current[patternNode.key] = candidate;
-			const subResults = this.findNodeBindings(
-				patternNodes,
-				allNodes,
-				homo,
-				index + 1,
-				current
-			);
-			results.push(...subResults);
-			delete current[patternNode.key];
-		}
-
-		return results;
-	}
-
-	private findEdgeBindings(
-		patternEdges: DBGraphEdge[],
-		allEdges: StoredEdge[],
-		nodeBinding: Record<string, StoredNode>,
-		type: DBGraphType,
-		homo: boolean,
-		index: number,
-		current: Record<string, StoredEdge>
-	): Record<string, StoredEdge>[] {
-		if (index >= patternEdges.length) {
-			return [{ ...current }];
-		}
-
-		const patternEdge = patternEdges[index];
-		const results: Record<string, StoredEdge>[] = [];
-
-		const sourceNode = nodeBinding[patternEdge.source];
-		const targetNode = nodeBinding[patternEdge.target];
-
-		if (!sourceNode || !targetNode) return [];
-
-		for (const candidate of allEdges) {
-			// Isomorphic check for edges
-			if (
-				!homo &&
-				Object.values(current).some((bound) => bound.key === candidate.key)
-			) {
-				continue;
-			}
-
-			let matches = false;
-			if (type === 'directed') {
-				matches =
-					candidate.source === sourceNode.key &&
-					candidate.target === targetNode.key;
-			} else {
-				matches =
-					(candidate.source === sourceNode.key &&
-						candidate.target === targetNode.key) ||
-					(candidate.source === targetNode.key &&
-						candidate.target === sourceNode.key);
-			}
-
-			if (!matches) continue;
-
-			// Check attribute match
-			if (!this.edgeMatchesPattern(candidate, patternEdge)) continue;
-
-			current[patternEdge.key] = candidate;
-			const subResults = this.findEdgeBindings(
-				patternEdges,
-				allEdges,
-				nodeBinding,
-				type,
-				homo,
-				index + 1,
-				current
-			);
-			results.push(...subResults);
-			delete current[patternEdge.key];
-		}
-
-		return results;
-	}
-
-	private nodeMatchesPattern(
-		node: StoredNode,
-		pattern: PatternNodeSchema
-	): boolean {
-		if (!pattern.attributes) return true;
-
-		for (const [attr, value] of Object.entries(pattern.attributes)) {
-			const nodeValue = node.attributes[attr];
-
-			if (Array.isArray(value)) {
-				// Pattern value is array → node value must be in the array
-				if (!value.includes(nodeValue as never)) return false;
-			} else {
-				if (nodeValue !== value) return false;
-			}
-		}
-
-		return true;
-	}
-
-	private edgeMatchesPattern(edge: StoredEdge, pattern: DBGraphEdge): boolean {
-		if (!pattern.attributes) return true;
-
-		for (const [attr, value] of Object.entries(pattern.attributes)) {
-			const edgeValue = edge.attributes[attr];
-
-			if (Array.isArray(value)) {
-				if (!value.includes(edgeValue as never)) return false;
-			} else {
-				if (edgeValue !== value) return false;
-			}
-		}
-
-		return true;
+		return finalResults;
 	}
 
 	/**
-	 * NAC check: for each NAC, try to extend the current match with the NAC's
-	 * pattern. If any extension is found, the NAC is violated and the match
-	 * should be rejected.
-	 *
-	 * Returns true if all NACs pass (no violations found).
+	 * Check whether a NAC pattern can be matched given the current binding.
+	 * Returns true if the NAC fires (violation), false if the match is safe.
 	 */
-	private checkNACs(
-		nacs: DBGraphNACs[],
-		nodeBinding: Record<string, StoredNode>,
-		edgeBinding: Record<string, StoredEdge>,
-		allNodes: StoredNode[],
-		allEdges: StoredEdge[]
-	): boolean {
-		for (const nac of nacs) {
-			const nacNodes = (nac.nodes || []) as PatternNodeSchema[];
-			const nacEdges = (nac.edges || []) as DBGraphEdge[];
-			const nacType = nac.options?.type ?? 'undirected';
+	private async nacMatchExists(
+		nac: DBGraphNACs,
+		matchResult: DBGraphPatternMatchResult
+	): Promise<boolean> {
+		const nacNodes = (nac.nodes || []) as PatternNodeSchema[];
+		const nacEdges = (nac.edges || []) as DBGraphEdge[];
+		const nacType = (nac.options?.type ?? 'undirected') as DBGraphType;
 
-			// First, check if already-bound NAC nodes satisfy the NAC's attribute constraints
-			let boundNodesMatch = true;
-			for (const nacNode of nacNodes) {
-				if (nacNode.key in nodeBinding) {
-					// This NAC node is already bound — check attribute constraints
-					if (
-						nacNode.attributes &&
-						!this.nodeMatchesPattern(nodeBinding[nacNode.key], nacNode)
-					) {
-						boundNodesMatch = false;
-						break;
-					}
-				}
-			}
+		if (!nacNodes.length && !nacEdges.length) return true;
 
-			if (!boundNodesMatch) {
-				// Already-bound nodes don't satisfy NAC constraints → NAC can't match → passes
-				continue;
-			}
+		let parameters: Record<string, unknown> = {};
+		const whereClauses: string[] = [];
+		const nodeQueries: string[] = [];
+		const edgeQueries: string[] = [];
 
-			// Find new (unbound) NAC nodes that need to be matched
-			const newNacNodes = nacNodes.filter((n) => !(n.key in nodeBinding));
-
-			// Build a combined node binding that includes existing bindings
-			// Then try to extend with new NAC nodes
-			const nacNodeBindings = this.findNodeBindings(
-				newNacNodes,
-				allNodes,
-				true, // NAC matching is homomorphic
-				0,
-				{ ...nodeBinding }
+		for (const nacNode of nacNodes) {
+			const { cypher, where, params } = computeNodeQuery(
+				nacNode.key,
+				[DEFAULT_NODE_LABEL],
+				nacNode.attributes ?? {}
 			);
+			nodeQueries.push(cypher);
+			if (where) whereClauses.push(where);
+			if (params) parameters = { ...parameters, ...params };
 
-			for (const nacNodeBinding of nacNodeBindings) {
-				const nacEdgeBindings = this.findEdgeBindings(
-					nacEdges,
-					allEdges,
-					nacNodeBinding,
-					nacType as DBGraphType,
-					true,
-					0,
-					{}
+			// Pin already-bound NAC nodes to their matched host node
+			if (nacNode.key in matchResult.nodes) {
+				const boundId = matchResult.nodes[nacNode.key].key;
+				const paramId = createParameterUuid();
+				parameters[paramId] = boundId;
+				whereClauses.push(
+					`\`${sanitizeIdentifier(nacNode.key)}\`._grs_internalId = $${paramId}`
 				);
-
-				if (nacEdges.length === 0 || nacEdgeBindings.length > 0) {
-					// NAC pattern found → this match is invalid
-					return false;
-				}
 			}
 		}
 
-		return true;
+		for (const edge of nacEdges) {
+			const { cypher, where, params } = computeEdgeQuery(
+				edge.key,
+				DEFAULT_RELATIONSHIP_LABEL,
+				edge.attributes,
+				edge.source,
+				edge.target,
+				nacType === 'directed'
+			);
+			edgeQueries.push(cypher);
+			if (where) whereClauses.push(where);
+			if (params) parameters = { ...parameters, ...params };
+		}
+
+		let matchPart = nodeQueries.join(', ');
+		if (nodeQueries.length && edgeQueries.length) matchPart += ', ';
+		matchPart += edgeQueries.join(', ');
+
+		if (!matchPart) return false;
+
+		const whereStr = whereClauses.length
+			? ' WHERE ' + whereClauses.join(' AND ')
+			: '';
+		const cypher = `MATCH ${matchPart}${whereStr} RETURN COUNT(*) AS c`;
+
+		const result = await this.db.executeCypher(cypher, parameters);
+		const rows = result.toArray();
+		if (!rows.length) return false;
+		return (rows[0].c as number) > 0;
 	}
 }
