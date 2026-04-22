@@ -18,7 +18,6 @@ import {
 	cmdDeleteEdge,
 } from './cli';
 import { Neo4jGraphService } from './service/db/neo4j/graph.service';
-import { IGraphDB } from './service/db/types';
 import { GraphSchema } from './types/graph.schema';
 
 // Mock fs module
@@ -209,6 +208,7 @@ describe('outputResult', () => {
 	let consoleSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
+		// eslint-disable-next-line @typescript-eslint/no-empty-function
 		consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 		vi.mocked(writeFileSync).mockReset();
 	});
@@ -252,20 +252,20 @@ describe('CLI command handlers', () => {
 			getAllNodes: vi.fn().mockResolvedValue(sampleGraph.nodes),
 			deleteNode: vi.fn().mockResolvedValue(undefined),
 			deleteAllNodes: vi.fn().mockResolvedValue([]),
-			createEdge: vi
-				.fn()
-				.mockResolvedValue({
-					key: 'new-edge',
-					source: 'A',
-					target: 'B',
-					attributes: {},
-				}),
+			createEdge: vi.fn().mockResolvedValue({
+				key: 'new-edge',
+				source: 'A',
+				target: 'B',
+				attributes: {},
+			}),
 			getEdge: vi.fn(),
 			deleteEdge: vi.fn().mockResolvedValue(undefined),
 			getAllEdges: vi.fn().mockResolvedValue(sampleGraph.edges),
 		} as unknown as Neo4jGraphService;
 
+		// eslint-disable-next-line @typescript-eslint/no-empty-function
 		consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		// eslint-disable-next-line @typescript-eslint/no-empty-function
 		consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		exitSpy = vi
 			.spyOn(process, 'exit')
