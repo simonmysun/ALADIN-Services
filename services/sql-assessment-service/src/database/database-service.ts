@@ -59,7 +59,7 @@ export class DatabaseService {
 	 *   skip the expensive round-trip.
 	 */
 	async ensureAnalyzed(
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		 
 		connectionInfo: any,
 		aliasMap?: IAliasMap,
 		lang: SupportedLanguage = 'en',
@@ -138,7 +138,7 @@ export class DatabaseService {
 	// -------------------------------------------------------------------------
 
 	private async analyzePGlite(
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		 
 		rawInfo: any,
 		lang: SupportedLanguage,
 	): Promise<AnalyzeResult> {

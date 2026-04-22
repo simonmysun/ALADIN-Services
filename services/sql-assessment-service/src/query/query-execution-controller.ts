@@ -216,7 +216,7 @@ export class QueryExecutionController {
 	// -------------------------------------------------------------------------
 
 	private async executeQueryOnPGlite(
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		 
 		connectionInfo: any,
 		query: string,
 		lang: SupportedLanguage,

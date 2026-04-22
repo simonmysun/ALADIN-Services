@@ -50,7 +50,7 @@ export class DatabaseAnalyzer {
 	 * @param aliasMap - Optional human-readable alias map.
 	 */
 	public async extractSchemaFromPGlite(
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		 
 		db: any,
 		key: string,
 		aliasMap?: IAliasMap,

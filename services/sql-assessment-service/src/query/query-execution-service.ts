@@ -73,7 +73,7 @@ export class QueryExecutionService {
 	 */
 	public async executeQueryOnPGlite(
 		query: string,
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		 
 		db: any,
 		lang: SupportedLanguage = 'en',
 	): Promise<QueryExecutionResult> {
