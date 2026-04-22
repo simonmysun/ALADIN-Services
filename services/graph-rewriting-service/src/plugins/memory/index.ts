@@ -11,10 +11,11 @@ import GraphSchema from '../../schemas/graph.schema.json';
 import GraphInstantiatedAttribute from '../../schemas/instantiated-attribute.schema.json';
 
 import { InMemoryGraphService } from '../../service/db/memory/graph.service';
+import { IGraphDB } from '../../service/db/types';
 
 declare module 'fastify' {
 	interface FastifyRequest {
-		dbGraphService: InMemoryGraphService | null;
+		dbGraphService: IGraphDB | null;
 	}
 }
 
@@ -27,7 +28,7 @@ const memoryConnector: FastifyPluginAsync = async (
 
 	const graphService = new InMemoryGraphService();
 
-	fastify.decorateRequest<InMemoryGraphService | null, 'dbGraphService'>(
+	fastify.decorateRequest<IGraphDB | null, 'dbGraphService'>(
 		'dbGraphService',
 		null
 	);
