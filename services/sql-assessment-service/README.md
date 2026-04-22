@@ -91,7 +91,7 @@ Instead of including `sqlContent` in every request, you can point the service at
 
 **Example — CLI:**
 ```bash
-npx ts-node src/cli.ts --init-sql-file ./schema.sql generate --databaseId mydb --task "List all products"
+npx ts-node src/cli/index.ts --init-sql-file ./schema.sql generation:generate '{"connectionInfo":{"type":"pglite","databaseId":"mydb"}}'
 ```
 
 **Example — Docker:**
