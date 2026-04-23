@@ -14,7 +14,14 @@ import {
 } from '../shared/utils/validation';
 import { t, SupportedLanguage } from '../shared/i18n';
 import { IAliasMap } from '../shared/interfaces/domain';
-import { pgliteInstances } from './internal-memory';
+import {
+	databaseMetadata,
+	pgliteInstances,
+	selfJoinDatabaseMetadata,
+} from './internal-memory';
+
+/** Canonical registry key used for the single shared init-SQL PGlite instance. */
+const INIT_PGLITE_ID = '__pglite_init__';
 
 export interface AnalyzeResult {
 	ok: boolean;
@@ -36,6 +43,8 @@ export interface AnalyzeResult {
 export class DatabaseService {
 	private readonly initSqlFilePath?: string;
 	private cachedInitSql?: string;
+	/** Single shared PGlite instance used for all init-SQL-backed databases. */
+	private cachedInitSqlPGlite?: PGlite;
 
 	constructor(
 		private readonly databaseAnalyzer: DatabaseAnalyzer,
@@ -89,26 +98,16 @@ export class DatabaseService {
 				}
 
 				// Fall back to the configured init-SQL file (if any).
+				// All callers share a single PGlite instance — no per-databaseId copy.
 				if (this.initSqlFilePath) {
-					try {
-						if (!this.cachedInitSql) {
-							this.cachedInitSql = await fs.readFile(
-								this.initSqlFilePath,
-								'utf-8',
-							);
-						}
-						sqlContent = this.cachedInitSql;
-					} catch (err) {
-						console.error(
-							`Failed to read init SQL file: ${this.initSqlFilePath}`,
-							err,
-						);
+					if (!databaseId || typeof databaseId !== 'string') {
 						return {
 							ok: false,
-							status: 500,
-							message: t('INIT_SQL_READ_ERROR', lang),
+							status: 400,
+							message: t('INVALID_CONNECTION_INFO', lang),
 						};
 					}
+					return this.ensureInitSqlPGliteRegistered(databaseId, aliasMap, lang);
 				}
 
 				if (!sqlContent) {
@@ -172,16 +171,17 @@ export class DatabaseService {
 			};
 		}
 
-		// Close and evict any existing instance for this id.
+		// Close and evict any existing instance for this id,
+		// but never close the shared init-SQL instance.
 		const existing = pgliteInstances.get(databaseId);
-		if (existing) {
+		if (existing && existing !== this.cachedInitSqlPGlite) {
 			try {
 				await existing.close();
 			} catch {
 				/* ignore */
 			}
-			pgliteInstances.delete(databaseId);
 		}
+		pgliteInstances.delete(databaseId);
 
 		let db: PGlite;
 		try {
@@ -217,6 +217,90 @@ export class DatabaseService {
 		}
 
 		pgliteInstances.set(databaseId, db);
+		return {
+			ok: true,
+			status: 200,
+			message: t('DATABASE_ANALYSIS_SUCCESS', lang),
+		};
+	}
+
+	/**
+	 * Lazily creates a single shared PGlite instance from the configured init
+	 * SQL file, then registers `databaseId` as an alias pointing at that shared
+	 * instance.  All callers that omit `sqlContent` share the same in-memory
+	 * database — no per-databaseId copy is ever created.
+	 */
+	private async ensureInitSqlPGliteRegistered(
+		databaseId: string,
+		aliasMap: IAliasMap | undefined,
+		lang: SupportedLanguage,
+	): Promise<AnalyzeResult> {
+		// Read and cache the init SQL file.
+		try {
+			if (!this.cachedInitSql) {
+				this.cachedInitSql = await fs.readFile(this.initSqlFilePath!, 'utf-8');
+			}
+		} catch (err) {
+			console.error(
+				`Failed to read init SQL file: ${this.initSqlFilePath}`,
+				err,
+			);
+			return {
+				ok: false,
+				status: 500,
+				message: t('INIT_SQL_READ_ERROR', lang),
+			};
+		}
+
+		// Create the shared PGlite instance once.
+		if (!this.cachedInitSqlPGlite) {
+			let db: PGlite;
+			try {
+				db = new PGlite();
+				await db.exec(this.cachedInitSql!);
+			} catch (error) {
+				console.error('PGlite initialisation failed', error);
+				return {
+					ok: false,
+					status: 500,
+					message: t('DATABASE_SCHEMA_EXTRACTION_FAILED', lang),
+				};
+			}
+
+			const canonicalKey = generatePGliteKey(INIT_PGLITE_ID);
+			const success = await this.databaseAnalyzer.extractSchemaFromPGlite(
+				db,
+				canonicalKey,
+				aliasMap,
+			);
+			if (!success) {
+				try {
+					await db.close();
+				} catch {
+					/* ignore */
+				}
+				return {
+					ok: false,
+					status: 500,
+					message: t('DATABASE_SCHEMA_EXTRACTION_FAILED', lang),
+				};
+			}
+
+			this.cachedInitSqlPGlite = db;
+		}
+
+		// Register the caller's databaseId pointing to the shared instance.
+		const databaseKey = generatePGliteKey(databaseId);
+		if (!databaseMetadata.has(databaseKey)) {
+			const canonicalKey = generatePGliteKey(INIT_PGLITE_ID);
+			databaseMetadata.set(databaseKey, databaseMetadata.get(canonicalKey)!);
+			const selfJoin = selfJoinDatabaseMetadata.get(canonicalKey);
+			if (selfJoin !== undefined) {
+				selfJoinDatabaseMetadata.set(databaseKey, selfJoin);
+			}
+		}
+		pgliteInstances.set(databaseId, this.cachedInitSqlPGlite);
+
 		return {
 			ok: true,
 			status: 200,

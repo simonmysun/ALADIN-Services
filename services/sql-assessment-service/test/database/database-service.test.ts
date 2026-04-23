@@ -163,7 +163,8 @@ describe('DatabaseService — initSqlFilePath', () => {
 	});
 
 	afterEach(async () => {
-		for (const db of pgliteInstances.values()) {
+		// Use a Set to avoid closing a shared instance more than once.
+		for (const db of new Set(pgliteInstances.values())) {
 			await db?.close?.();
 		}
 		pgliteInstances.clear();
@@ -229,5 +230,21 @@ describe('DatabaseService — initSqlFilePath', () => {
 			true,
 		);
 		expect(result.ok).toBe(true);
+	});
+
+	it('multiple databaseIds without sqlContent share a single PGlite instance', async () => {
+		const r1 = await service.ensureAnalyzed({
+			type: 'pglite',
+			databaseId: 'db-a',
+		});
+		const r2 = await service.ensureAnalyzed({
+			type: 'pglite',
+			databaseId: 'db-b',
+		});
+
+		expect(r1.ok).toBe(true);
+		expect(r2.ok).toBe(true);
+		// Both databaseIds must resolve to the same in-memory PGlite object.
+		expect(pgliteInstances.get('db-a')).toBe(pgliteInstances.get('db-b'));
 	});
 });
