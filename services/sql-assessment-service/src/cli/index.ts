@@ -59,15 +59,32 @@ async function readStdin(): Promise<string> {
 	});
 }
 
+/**
+ * Resolves the --init-sql-file flag value from the raw CLI args.
+ * Throws if the flag is present but not followed by a non-flag argument,
+ * so the caller can surface a clear error instead of silently ignoring it.
+ */
+export function resolveInitSqlFile(args: string[]): string | undefined {
+	const idx = args.indexOf('--init-sql-file');
+	if (idx === -1) return undefined;
+	const value = args[idx + 1];
+	if (!value || value.startsWith('-')) {
+		throw new Error('--init-sql-file requires a path argument.');
+	}
+	return path.resolve(value);
+}
+
 async function main() {
 	const args = process.argv.slice(2);
 
 	// ── Resolve --init-sql-file early so it feeds buildRouteTable ────────────
-	const initSqlFileIdx = args.indexOf('--init-sql-file');
-	const initSqlFile =
-		initSqlFileIdx !== -1 && args[initSqlFileIdx + 1]
-			? path.resolve(args[initSqlFileIdx + 1])
-			: undefined;
+	let initSqlFile: string | undefined;
+	try {
+		initSqlFile = resolveInitSqlFile(args);
+	} catch (e) {
+		console.error((e as Error).message);
+		process.exit(1);
+	}
 
 	if (
 		args.includes('--list') ||
