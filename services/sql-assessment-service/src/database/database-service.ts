@@ -122,7 +122,11 @@ export class DatabaseService {
 					return { ok: true, status: 200, message: 'skipped' };
 				}
 			}
-			return this.analyzePGlite({ ...connectionInfo, sqlContent }, lang);
+			return this.analyzePGlite(
+				{ ...connectionInfo, sqlContent },
+				aliasMap,
+				lang,
+			);
 		}
 
 		// PostgreSQL – validate first so we never generate a bogus key from undefined fields.
@@ -148,6 +152,7 @@ export class DatabaseService {
 
 	private async analyzePGlite(
 		rawInfo: any,
+		aliasMap: IAliasMap | undefined,
 		lang: SupportedLanguage,
 	): Promise<AnalyzeResult> {
 		const { databaseId, sqlContent } = rawInfo ?? {};
@@ -195,6 +200,7 @@ export class DatabaseService {
 		const success = await this.databaseAnalyzer.extractSchemaFromPGlite(
 			db,
 			key,
+			aliasMap,
 		);
 
 		if (!success) {
