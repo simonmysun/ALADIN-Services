@@ -184,10 +184,16 @@ export class InMemoryGraphService implements IGraphDB {
 			_grs_target: internalIdTarget,
 		};
 
-		await this.db.executeCypher(
-			`MATCH (a:\`${DEFAULT_NODE_LABEL}\`), (b:\`${DEFAULT_NODE_LABEL}\`) WHERE a._grs_internalId = $src AND b._grs_internalId = $tgt CREATE (a)-[r:\`${DEFAULT_RELATIONSHIP_LABEL}\`]->(b) SET r = $attrs`,
+		const result = await this.db.executeCypher(
+			`MATCH (a:\`${DEFAULT_NODE_LABEL}\`), (b:\`${DEFAULT_NODE_LABEL}\`) WHERE a._grs_internalId = $src AND b._grs_internalId = $tgt CREATE (a)-[r:\`${DEFAULT_RELATIONSHIP_LABEL}\`]->(b) SET r = $attrs RETURN r`,
 			{ src: internalIdSource, tgt: internalIdTarget, attrs: storedAttrs }
 		);
+
+		if (!result.toArray().length) {
+			throw new Error(
+				`InMemoryGraphService: createEdge failed — one or both endpoints do not exist (src=${internalIdSource}, tgt=${internalIdTarget})`
+			);
+		}
 
 		const edge: DBGraphEdgeResult = {
 			key: internalId,
