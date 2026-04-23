@@ -133,6 +133,36 @@ export class DatabaseAnalyzer {
 					uqGroups.set(r.constraint_name, cols);
 				}
 
+				// Query unique indices from pg_catalog so that explicit
+				// CREATE UNIQUE INDEX statements are also captured.  Primary-key
+				// indices are excluded because they are handled via primaryColumns.
+				// Results are ordered by attnum so that composite index column order
+				// is preserved.
+				const idxRes = await db.query(
+					`SELECT i.relname AS index_name, a.attname AS column_name
+					 FROM pg_class t
+					 JOIN pg_namespace n ON n.oid = t.relnamespace
+					 JOIN pg_index ix ON t.oid = ix.indrelid
+					 JOIN pg_class i ON i.oid = ix.indexrelid
+					 JOIN pg_attribute a
+					   ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+					 WHERE n.nspname = $1 AND t.relname = $2
+					   AND ix.indisunique = true AND NOT ix.indisprimary
+					 ORDER BY i.relname, a.attnum`,
+					[schema, tableName],
+				);
+
+				// Group per index name (composite indices → multiple columns).
+				const idxGroups = new Map<string, string[]>();
+				for (const r of idxRes.rows as Array<{
+					index_name: string;
+					column_name: string;
+				}>) {
+					const cols = idxGroups.get(r.index_name) ?? [];
+					cols.push(r.column_name);
+					idxGroups.set(r.index_name, cols);
+				}
+
 				// Cast as unknown as Table so the existing private helpers
 				// (which type-check against TypeORM's Table) can be reused.
 				// At runtime only the properties accessed by those helpers need
@@ -152,7 +182,11 @@ export class DatabaseAnalyzer {
 						referencedColumnNames: [r.referenced_column],
 					})),
 					uniques: [...uqGroups.values()].map((columnNames) => ({ columnNames })),
-					indices: [],
+					indices: [...idxGroups.entries()].map(([name, columnNames]) => ({
+						name,
+						columnNames,
+						isUnique: true,
+					})),
 				} as unknown as Table);
 			}
 

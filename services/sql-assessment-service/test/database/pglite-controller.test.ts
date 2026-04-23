@@ -319,5 +319,72 @@ describe('DatabaseController — PGlite path', () => {
 
 			expect(rel.cardinality).toBe(RelationshipType.OneToOne);
 		});
+
+		/**
+		 * A single-column CREATE UNIQUE INDEX on a FK column must be treated the
+		 * same as a UNIQUE constraint: the relationship should be classified as 1:1.
+		 */
+		it('classifies FK as 1:1 when it has a single-column CREATE UNIQUE INDEX', async () => {
+			const ddl = `
+				CREATE TABLE users    (id SERIAL PRIMARY KEY, name TEXT NOT NULL);
+				CREATE TABLE profiles (
+					id      SERIAL  PRIMARY KEY,
+					user_id INTEGER NOT NULL REFERENCES users(id)
+				);
+				CREATE UNIQUE INDEX profiles_user_id_idx ON profiles(user_id);
+			`;
+			const { res } = mockRes();
+			await controller.analyzeDatabase(
+				mockReq({
+					connectionInfo: {
+						type: 'pglite',
+						databaseId: 'uq-idx-single',
+						sqlContent: ddl,
+					},
+				}),
+				res,
+			);
+
+			const tables = databaseMetadata.get(generatePGliteKey('uq-idx-single'))!;
+			const profiles = tables.find((t) => t.name === 'profiles')!;
+			const rel = profiles.relationships.find((r) => r.referencedTable === 'users')!;
+
+			expect(rel.cardinality).toBe(RelationshipType.OneToOne);
+		});
+
+		/**
+		 * A composite CREATE UNIQUE INDEX must NOT make either FK column
+		 * individually unique.  Both FK relationships should remain 1:N.
+		 */
+		it('classifies FK as 1:N when it participates in a composite CREATE UNIQUE INDEX', async () => {
+			const ddl = `
+				CREATE TABLE products  (id SERIAL PRIMARY KEY, name TEXT NOT NULL);
+				CREATE TABLE customers (id SERIAL PRIMARY KEY, name TEXT NOT NULL);
+				CREATE TABLE orders (
+					id          SERIAL  PRIMARY KEY,
+					product_id  INTEGER NOT NULL REFERENCES products(id),
+					customer_id INTEGER NOT NULL REFERENCES customers(id)
+				);
+				CREATE UNIQUE INDEX orders_composite_idx ON orders(product_id, customer_id);
+			`;
+			const { res } = mockRes();
+			await controller.analyzeDatabase(
+				mockReq({
+					connectionInfo: {
+						type: 'pglite',
+						databaseId: 'uq-idx-composite',
+						sqlContent: ddl,
+					},
+				}),
+				res,
+			);
+
+			const tables = databaseMetadata.get(generatePGliteKey('uq-idx-composite'))!;
+			const orders = tables.find((t) => t.name === 'orders')!;
+
+			for (const rel of orders.relationships) {
+				expect(rel.cardinality).toBe(RelationshipType.OneToMany);
+			}
+		});
 	});
 });
