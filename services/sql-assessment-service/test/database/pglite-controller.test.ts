@@ -16,6 +16,7 @@ import {
 	pgliteInstances,
 } from '../../src/database/internal-memory';
 import { generatePGliteKey } from '../../src/shared/utils/database-utils';
+import { RelationshipType } from '../../src/shared/interfaces/domain';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -245,6 +246,78 @@ describe('DatabaseController — PGlite path', () => {
 			expect(tables!.map((t) => t.name)).not.toContain('products');
 			// A new PGlite instance must replace the old one
 			expect(pgliteInstances.get('test-db')).not.toBe(firstInstance);
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// UNIQUE constraint cardinality classification
+	// -----------------------------------------------------------------------
+
+	describe('analyzeDatabase — UNIQUE constraint cardinality', () => {
+		/**
+		 * A composite UNIQUE(order_id, product_id) must NOT make either FK column
+		 * look individually unique.  Both FK relationships should remain 1:N.
+		 */
+		it('classifies FK as 1:N when it participates in a composite UNIQUE constraint', async () => {
+			const ddl = `
+				CREATE TABLE products  (id SERIAL PRIMARY KEY, name TEXT NOT NULL);
+				CREATE TABLE customers (id SERIAL PRIMARY KEY, name TEXT NOT NULL);
+				CREATE TABLE orders (
+					id          SERIAL  PRIMARY KEY,
+					product_id  INTEGER NOT NULL REFERENCES products(id),
+					customer_id INTEGER NOT NULL REFERENCES customers(id),
+					UNIQUE (product_id, customer_id)
+				);
+			`;
+			const { res } = mockRes();
+			await controller.analyzeDatabase(
+				mockReq({
+					connectionInfo: {
+						type: 'pglite',
+						databaseId: 'uq-composite',
+						sqlContent: ddl,
+					},
+				}),
+				res,
+			);
+
+			const tables = databaseMetadata.get(generatePGliteKey('uq-composite'))!;
+			const orders = tables.find((t) => t.name === 'orders')!;
+
+			for (const rel of orders.relationships) {
+				expect(rel.cardinality).toBe(RelationshipType.OneToMany);
+			}
+		});
+
+		/**
+		 * A single-column UNIQUE on a FK column IS a genuine 1:1 indicator and
+		 * the relationship should be classified accordingly.
+		 */
+		it('classifies FK as 1:1 when it has a single-column UNIQUE constraint', async () => {
+			const ddl = `
+				CREATE TABLE users    (id SERIAL PRIMARY KEY, name TEXT NOT NULL);
+				CREATE TABLE profiles (
+					id      SERIAL  PRIMARY KEY,
+					user_id INTEGER NOT NULL UNIQUE REFERENCES users(id)
+				);
+			`;
+			const { res } = mockRes();
+			await controller.analyzeDatabase(
+				mockReq({
+					connectionInfo: {
+						type: 'pglite',
+						databaseId: 'uq-single',
+						sqlContent: ddl,
+					},
+				}),
+				res,
+			);
+
+			const tables = databaseMetadata.get(generatePGliteKey('uq-single'))!;
+			const profiles = tables.find((t) => t.name === 'profiles')!;
+			const rel = profiles.relationships.find((r) => r.referencedTable === 'users')!;
+
+			expect(rel.cardinality).toBe(RelationshipType.OneToOne);
 		});
 	});
 });

@@ -109,15 +109,29 @@ export class DatabaseAnalyzer {
 				);
 
 				const uqRes = await db.query(
-					`SELECT kcu.column_name
+					`SELECT tc.constraint_name, kcu.column_name
 					 FROM information_schema.table_constraints tc
 					 JOIN information_schema.key_column_usage kcu
 					   ON tc.constraint_name = kcu.constraint_name
 					   AND tc.table_schema = kcu.table_schema
 					 WHERE tc.constraint_type = 'UNIQUE'
-					   AND tc.table_schema = $1 AND tc.table_name = $2`,
+					   AND tc.table_schema = $1 AND tc.table_name = $2
+					 ORDER BY tc.constraint_name, kcu.ordinal_position`,
 					[schema, tableName],
 				);
+
+				// Group columns by constraint name so that composite UNIQUE constraints
+				// are represented as a single entry with multiple columnNames, matching
+				// the shape TypeORM returns for the real-DB path.
+				const uqGroups = new Map<string, string[]>();
+				for (const r of uqRes.rows as Array<{
+					constraint_name: string;
+					column_name: string;
+				}>) {
+					const cols = uqGroups.get(r.constraint_name) ?? [];
+					cols.push(r.column_name);
+					uqGroups.set(r.constraint_name, cols);
+				}
 
 				// Cast as unknown as Table so the existing private helpers
 				// (which type-check against TypeORM's Table) can be reused.
@@ -137,9 +151,7 @@ export class DatabaseAnalyzer {
 						referencedTableName: r.referenced_table,
 						referencedColumnNames: [r.referenced_column],
 					})),
-					uniques: uqRes.rows.map((r: any) => ({
-						columnNames: [r.column_name],
-					})),
+					uniques: [...uqGroups.values()].map((columnNames) => ({ columnNames })),
 					indices: [],
 				} as unknown as Table);
 			}
@@ -194,8 +206,14 @@ export class DatabaseAnalyzer {
 			);
 
 			// --- Collect unique-indexed column names (used for 1:1 detection) ---
+			// Only single-column UNIQUE constraints make a column individually unique.
+			// A composite UNIQUE(col_a, col_b) must NOT mark col_a or col_b as unique
+			// on their own, otherwise buildRelationships() would misclassify 1:N FKs
+			// as 1:1.
 			const uniqueColumnNames = new Set<string>(
-				table.uniques.flatMap((u) => u.columnNames),
+				table.uniques
+					.filter((u) => u.columnNames.length === 1)
+					.map((u) => u.columnNames[0]),
 			);
 
 			// --- Build parsed columns ---
@@ -428,11 +446,16 @@ export class DatabaseAnalyzer {
 				? Participation.Optional
 				: Participation.Mandatory;
 
-			// 1:1 if the FK column has a unique constraint or unique index
+			// 1:1 if the FK column has a unique constraint or unique index that covers
+			// exactly that one column. Composite unique constraints / indices must not
+			// qualify, because UNIQUE(a, b) does not mean column a is individually unique.
 			const hasUniqueConstraint =
 				uniqueColumnNames.has(fkCol) ||
 				table.indices.some(
-					(idx) => idx.isUnique && idx.columnNames.includes(fkCol),
+					(idx) =>
+						idx.isUnique &&
+						idx.columnNames.length === 1 &&
+						idx.columnNames[0] === fkCol,
 				);
 
 			// N:M is assigned later by propagateManyToMany; default to 1:N here
