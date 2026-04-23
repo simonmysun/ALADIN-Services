@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { createControllers } from './bootstrap';
 import { registerControllers, startRestApi } from './api/rest-api';
 
