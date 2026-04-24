@@ -1,6 +1,29 @@
 import { DataSource, QueryRunner } from 'typeorm';
 import { IAliasMap, IParsedTable } from '../interfaces/domain';
 
+/**
+ * Database-agnostic query executor: accepts a SQL string and returns the
+ * result rows as a plain array.  Works with both Postgres (TypeORM) and
+ * PGlite execution paths.
+ */
+export type RowQueryFn = (sql: string) => Promise<any[]>;
+
+/**
+ * Builds a {@link RowQueryFn} backed by a TypeORM {@link DataSource}.
+ * Each invocation acquires a QueryRunner from the pool, executes the query,
+ * and releases the runner before returning.
+ */
+export function makeRowQueryFn(dataSource: DataSource): RowQueryFn {
+	return async (sql: string) => {
+		const queryRunner = dataSource.createQueryRunner();
+		try {
+			return await queryRunner.query(sql);
+		} finally {
+			await queryRunner.release();
+		}
+	};
+}
+
 export function generateDatabaseKey(
 	host: string,
 	port: number,
