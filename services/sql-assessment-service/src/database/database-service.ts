@@ -87,7 +87,11 @@ export class DatabaseService {
 			// Resolve sqlContent: use the value from the request body first.
 			let sqlContent: string | undefined = connectionInfo.sqlContent;
 
-			if (!sqlContent) {
+			// Distinguish "absent" (null/undefined) from "present but invalid"
+			// (e.g. empty string). An explicitly-supplied empty string is not
+			// treated as absent — it falls through to analyzePGlite, which
+			// validates it and returns a 400.
+			if (sqlContent == null) {
 				// If the DB is already registered and the caller did not supply new
 				// sqlContent, treat this as a no-op — same semantics as the PG branch.
 				const databaseId: string | undefined = connectionInfo.databaseId;
@@ -112,16 +116,14 @@ export class DatabaseService {
 					return this.ensureInitSqlPGliteRegistered(databaseId, aliasMap, lang);
 				}
 
-				if (!sqlContent) {
-					if (required) {
-						return {
-							ok: false,
-							status: 400,
-							message: t('INVALID_CONNECTION_INFO', lang),
-						};
-					}
-					return { ok: true, status: 200, message: 'skipped' };
+				if (required) {
+					return {
+						ok: false,
+						status: 400,
+						message: t('INVALID_CONNECTION_INFO', lang),
+					};
 				}
+				return { ok: true, status: 200, message: 'skipped' };
 			}
 			return this.analyzePGlite(
 				{ ...connectionInfo, sqlContent },

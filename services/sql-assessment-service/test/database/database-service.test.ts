@@ -100,6 +100,29 @@ describe('DatabaseService — ensureAnalyzed', () => {
 			expect(databaseMetadata.has(DB_KEY)).toBe(false);
 		});
 
+		it('returns 400 when sqlContent is an empty string (required=false)', async () => {
+			const result = await service.ensureAnalyzed({
+				type: 'pglite',
+				databaseId: DB_ID,
+				sqlContent: '',
+			});
+
+			expect(result.ok).toBe(false);
+			expect(result.status).toBe(400);
+		});
+
+		it('returns 400 when sqlContent is an empty string (required=true)', async () => {
+			const result = await service.ensureAnalyzed(
+				{ type: 'pglite', databaseId: DB_ID, sqlContent: '' },
+				undefined,
+				'en',
+				true,
+			);
+
+			expect(result.ok).toBe(false);
+			expect(result.status).toBe(400);
+		});
+
 		it('returns 400 when sqlContent is absent and required=true', async () => {
 			const result = await service.ensureAnalyzed(
 				{ type: 'pglite', databaseId: DB_ID },
