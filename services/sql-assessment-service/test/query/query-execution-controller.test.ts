@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { QueryExecutionController } from '../../src/query/query-execution-controller';
 import { QueryExecutionService, QueryExecutionError } from '../../src/query/query-execution-service';
 import { databaseMetadata } from '../../src/database/internal-memory';
@@ -197,6 +197,35 @@ describe('QueryExecutionController', () => {
         it('preserves the message', () => {
             const err = new QueryExecutionError('Only SELECT queries are permitted.', 'NON_SELECT');
             expect(err.message).toBe('Only SELECT queries are permitted.');
+        });
+
+    });
+
+    // -------------------------------------------------------------------------
+    // Route-handler error propagation
+    // -------------------------------------------------------------------------
+
+    describe('POST /execute route handler', () => {
+
+        it('forwards unexpected executeQuery rejections to next()', async () => {
+            const boom = new Error('unexpected DB crash');
+            vi.spyOn(controller, 'executeQuery').mockRejectedValueOnce(boom);
+
+            const req = mockReq({}) as Request;
+            const { res } = mockRes();
+            const next = vi.fn() as unknown as NextFunction;
+
+            // Resolve as soon as next() is invoked so we can await deterministically.
+            const nextCalled = new Promise<void>((resolve) => {
+                (next as ReturnType<typeof vi.fn>).mockImplementation(() => resolve());
+            });
+
+            // Invoke the handler registered by initializeRoutes() directly.
+            const [routeLayer] = (controller.router as any).stack;
+            routeLayer.route.stack[0].handle(req, res, next);
+            await nextCalled;
+
+            expect(next).toHaveBeenCalledWith(boom);
         });
 
     });

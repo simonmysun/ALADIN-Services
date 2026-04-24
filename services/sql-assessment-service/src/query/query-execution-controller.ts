@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { DataSource } from 'typeorm';
 import {
 	connectToDatabase,
@@ -93,8 +93,8 @@ export class QueryExecutionController {
 	}
 
 	private initializeRoutes(): void {
-		this.router.post('/execute', (req: Request, res: Response) => {
-			this.executeQuery(req, res);
+		this.router.post('/execute', (req: Request, res: Response, next: NextFunction) => {
+			this.executeQuery(req, res).catch(next);
 		});
 	}
 
