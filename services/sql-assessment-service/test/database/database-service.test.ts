@@ -247,4 +247,22 @@ describe('DatabaseService — initSqlFilePath', () => {
 		// Both databaseIds must resolve to the same in-memory PGlite object.
 		expect(pgliteInstances.get('db-a')).toBe(pgliteInstances.get('db-b'));
 	});
+
+	it('concurrent calls without sqlContent create only one shared PGlite instance', async () => {
+		// Fire both registrations concurrently — without the Promise-coalescing
+		// fix the two calls would each pass the "!cachedInitSqlPGlite" guard
+		// before either await chain completes, spawning two PGlite instances
+		// and leaking the first one.
+		const [r1, r2] = await Promise.all([
+			service.ensureAnalyzed({ type: 'pglite', databaseId: 'db-concurrent-1' }),
+			service.ensureAnalyzed({ type: 'pglite', databaseId: 'db-concurrent-2' }),
+		]);
+
+		expect(r1.ok).toBe(true);
+		expect(r2.ok).toBe(true);
+		// Both ids must point to the exact same PGlite object (shared singleton).
+		expect(pgliteInstances.get('db-concurrent-1')).toBe(
+			pgliteInstances.get('db-concurrent-2'),
+		);
+	});
 });

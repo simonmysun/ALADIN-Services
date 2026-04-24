@@ -45,6 +45,8 @@ export class DatabaseService {
 	private cachedInitSql?: string;
 	/** Single shared PGlite instance used for all init-SQL-backed databases. */
 	private cachedInitSqlPGlite?: PGlite;
+	/** In-flight promise for the first initialisation of {@link cachedInitSqlPGlite}. */
+	private initSqlPGlitePromise?: Promise<PGlite | null>;
 
 	constructor(
 		private readonly databaseAnalyzer: DatabaseAnalyzer,
@@ -252,42 +254,49 @@ export class DatabaseService {
 			};
 		}
 
-		// Create the shared PGlite instance once.
-		if (!this.cachedInitSqlPGlite) {
-			let db: PGlite;
-			try {
-				db = new PGlite();
-				await db.exec(this.cachedInitSql!);
-			} catch (error) {
-				console.error('PGlite initialisation failed', error);
-				return {
-					ok: false,
-					status: 500,
-					message: t('DATABASE_SCHEMA_EXTRACTION_FAILED', lang),
-				};
-			}
-
-			const canonicalKey = generatePGliteKey(INIT_PGLITE_ID);
-			const success = await this.databaseAnalyzer.extractSchemaFromPGlite(
-				db,
-				canonicalKey,
-				aliasMap,
-			);
-			if (!success) {
+		// Create the shared PGlite instance once — race-safe via a stored Promise
+		// so concurrent callers coalesce onto the same initialisation rather than
+		// each spawning their own PGlite instance.
+		if (!this.initSqlPGlitePromise) {
+			this.initSqlPGlitePromise = (async (): Promise<PGlite | null> => {
+				let db: PGlite;
 				try {
-					await db.close();
-				} catch {
-					/* ignore */
+					db = new PGlite();
+					await db.exec(this.cachedInitSql!);
+				} catch (error) {
+					console.error('PGlite initialisation failed', error);
+					return null;
 				}
-				return {
-					ok: false,
-					status: 500,
-					message: t('DATABASE_SCHEMA_EXTRACTION_FAILED', lang),
-				};
-			}
 
-			this.cachedInitSqlPGlite = db;
+				const canonicalKey = generatePGliteKey(INIT_PGLITE_ID);
+				const success = await this.databaseAnalyzer.extractSchemaFromPGlite(
+					db,
+					canonicalKey,
+					aliasMap,
+				);
+				if (!success) {
+					try {
+						await db.close();
+					} catch {
+						/* ignore */
+					}
+					return null;
+				}
+
+				return db;
+			})();
 		}
+		const db = await this.initSqlPGlitePromise;
+		if (!db) {
+			// Allow future calls to retry after a failed initialisation.
+			this.initSqlPGlitePromise = undefined;
+			return {
+				ok: false,
+				status: 500,
+				message: t('DATABASE_SCHEMA_EXTRACTION_FAILED', lang),
+			};
+		}
+		this.cachedInitSqlPGlite = db;
 
 		// Register the caller's databaseId pointing to the shared instance.
 		const databaseKey = generatePGliteKey(databaseId);
