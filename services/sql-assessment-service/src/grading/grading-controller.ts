@@ -282,12 +282,6 @@ export class GradingController {
 			return null;
 		}
 
-		const validationError = validateConnectionInfo(body.connectionInfo, lang);
-		if (validationError) {
-			res.status(400).json({ message: validationError });
-			return null;
-		}
-
 		// ---- auto-analyze ---------------------------------------------------
 		if (this.databaseService) {
 			const analyzed = await this.databaseService.ensureAnalyzed(
@@ -301,6 +295,21 @@ export class GradingController {
 			}
 		}
 		// ---------------------------------------------------------------------
+
+		// ---- PGlite branch --------------------------------------------------
+		if ((body.connectionInfo as any)?.type === 'pglite') {
+			res
+				.status(400)
+				.json({ message: t('GRADING_PGLITE_NOT_SUPPORTED', lang) });
+			return null;
+		}
+		// ---------------------------------------------------------------------
+
+		const validationError = validateConnectionInfo(body.connectionInfo, lang);
+		if (validationError) {
+			res.status(400).json({ message: validationError });
+			return null;
+		}
 
 		const { host, port, schema } = body.connectionInfo;
 		const databaseKey = generateDatabaseKey(host!, port!, schema!);
@@ -392,11 +401,6 @@ export class GradingController {
 				.json({ message: t('GRADING_CONNECTION_READ_ERROR', lang) });
 		}
 
-		const validationError = validateConnectionInfo(connectionInfo, lang);
-		if (validationError) {
-			return res.status(400).json({ message: validationError });
-		}
-
 		// ---- auto-analyze ---------------------------------------------------
 		if (this.databaseService) {
 			const analyzed = await this.databaseService.ensureAnalyzed(
@@ -409,6 +413,19 @@ export class GradingController {
 			}
 		}
 		// ---------------------------------------------------------------------
+
+		// ---- PGlite branch --------------------------------------------------
+		if ((connectionInfo as any)?.type === 'pglite') {
+			return res
+				.status(400)
+				.json({ message: t('GRADING_PGLITE_NOT_SUPPORTED', lang) });
+		}
+		// ---------------------------------------------------------------------
+
+		const validationError = validateConnectionInfo(connectionInfo, lang);
+		if (validationError) {
+			return res.status(400).json({ message: validationError });
+		}
 
 		const databaseKey = generateDatabaseKey(
 			connectionInfo.host!,
