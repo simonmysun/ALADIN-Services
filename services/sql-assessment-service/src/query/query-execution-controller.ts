@@ -93,9 +93,12 @@ export class QueryExecutionController {
 	}
 
 	private initializeRoutes(): void {
-		this.router.post('/execute', (req: Request, res: Response, next: NextFunction) => {
-			this.executeQuery(req, res).catch(next);
-		});
+		this.router.post(
+			'/execute',
+			(req: Request, res: Response, next: NextFunction) => {
+				this.executeQuery(req, res).catch(next);
+			},
+		);
 	}
 
 	public async executeQuery(req: Request, res: Response): Promise<Response> {
