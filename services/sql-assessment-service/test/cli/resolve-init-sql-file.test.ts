@@ -15,9 +15,9 @@ describe('resolveInitSqlFile', () => {
 	});
 
 	it('throws when --init-sql-file is followed by another flag', () => {
-		expect(() =>
-			resolveInitSqlFile(['--init-sql-file', '--stdin']),
-		).toThrow('--init-sql-file requires a path argument.');
+		expect(() => resolveInitSqlFile(['--init-sql-file', '--stdin'])).toThrow(
+			'--init-sql-file requires a path argument.',
+		);
 	});
 
 	it('returns the resolved absolute path when a valid path is provided', () => {
