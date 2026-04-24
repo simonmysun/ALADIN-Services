@@ -199,6 +199,11 @@ describe('InMemoryGraphService', () => {
 			expect(result).toBeUndefined();
 		});
 
+		test('deleteEdge returns undefined for missing edge', async () => {
+			const result = await graphService.deleteEdge('nonexistent');
+			expect(result).toBeUndefined();
+		});
+
 		test('deleteEdges', async () => {
 			await graphService.createNode({}, 'a');
 			await graphService.createNode({}, 'b');

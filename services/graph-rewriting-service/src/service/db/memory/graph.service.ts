@@ -250,10 +250,9 @@ export class InMemoryGraphService implements IGraphDB {
 
 	public async deleteEdge(
 		internalId: DBGraphEdgeInternalId
-	): Promise<DBGraphEdgeResult> {
+	): Promise<DBGraphEdgeResult | undefined> {
 		const edge = this.edgeStore.get(internalId);
-		if (!edge)
-			return { key: internalId, source: '', target: '', attributes: {} };
+		if (!edge) return undefined;
 		this.edgeStore.delete(internalId);
 
 		// Find other edges that share the same src/tgt (multigraph survivors)
@@ -292,7 +291,8 @@ export class InMemoryGraphService implements IGraphDB {
 	): Promise<DBGraphEdgeResult[]> {
 		const results: DBGraphEdgeResult[] = [];
 		for (const id of internalIds) {
-			results.push(await this.deleteEdge(id));
+			const r = await this.deleteEdge(id);
+			if (r) results.push(r);
 		}
 		return results;
 	}
