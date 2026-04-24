@@ -6,6 +6,7 @@ import {
 	QueryExecutionError,
 } from '../../src/query/query-execution-service';
 import { databaseMetadata } from '../../src/database/internal-memory';
+import { generateDatabaseKey } from '../../src/shared/utils/database-utils';
 
 // ---------------------------------------------------------------------------
 // Express mock helpers
@@ -39,7 +40,11 @@ const VALID_CONNECTION = {
 	schema: 'northwind',
 };
 
-const DB_KEY = `localhost5432northwind`;
+const DB_KEY = generateDatabaseKey(
+	VALID_CONNECTION.host,
+	VALID_CONNECTION.port,
+	VALID_CONNECTION.schema,
+);
 
 let controller: QueryExecutionController;
 let serviceMock: QueryExecutionService;
