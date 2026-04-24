@@ -12,8 +12,8 @@ COPY tsconfig.json import-meta-url.js ./
 RUN npm run build
 
 # Install only production deps for the runtime image.
-# @electric-sql/pglite is excluded from the bundle (WASM cannot be inlined)
-# so it must be present in node_modules at runtime.
+# @electric-sql/pglite is excluded from the bundle (WASM cannot be inlined).
+# swagger-ui-dist is excluded because it serves static files from the filesystem.
 RUN npm ci --omit=dev
 
 # ---- production stage ----
@@ -23,7 +23,6 @@ WORKDIR /app
 
 COPY --from=build /app/build/ ./build/
 COPY --from=build /app/node_modules/@electric-sql/pglite ./node_modules/@electric-sql/pglite
-COPY --from=build /app/node_modules/swagger-ui-express ./node_modules/swagger-ui-express
 COPY --from=build /app/node_modules/swagger-ui-dist ./node_modules/swagger-ui-dist
 
 EXPOSE 3000
