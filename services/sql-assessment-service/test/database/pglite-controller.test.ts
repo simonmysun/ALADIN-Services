@@ -315,7 +315,9 @@ describe('DatabaseController — PGlite path', () => {
 
 			const tables = databaseMetadata.get(generatePGliteKey('uq-single'))!;
 			const profiles = tables.find((t) => t.name === 'profiles')!;
-			const rel = profiles.relationships.find((r) => r.referencedTable === 'users')!;
+			const rel = profiles.relationships.find(
+				(r) => r.referencedTable === 'users',
+			)!;
 
 			expect(rel.cardinality).toBe(RelationshipType.OneToOne);
 		});
@@ -347,7 +349,9 @@ describe('DatabaseController — PGlite path', () => {
 
 			const tables = databaseMetadata.get(generatePGliteKey('uq-idx-single'))!;
 			const profiles = tables.find((t) => t.name === 'profiles')!;
-			const rel = profiles.relationships.find((r) => r.referencedTable === 'users')!;
+			const rel = profiles.relationships.find(
+				(r) => r.referencedTable === 'users',
+			)!;
 
 			expect(rel.cardinality).toBe(RelationshipType.OneToOne);
 		});
@@ -379,7 +383,9 @@ describe('DatabaseController — PGlite path', () => {
 				res,
 			);
 
-			const tables = databaseMetadata.get(generatePGliteKey('uq-idx-composite'))!;
+			const tables = databaseMetadata.get(
+				generatePGliteKey('uq-idx-composite'),
+			)!;
 			const orders = tables.find((t) => t.name === 'orders')!;
 
 			for (const rel of orders.relationships) {

@@ -181,7 +181,9 @@ export class DatabaseAnalyzer {
 						referencedTableName: r.referenced_table,
 						referencedColumnNames: [r.referenced_column],
 					})),
-					uniques: [...uqGroups.values()].map((columnNames) => ({ columnNames })),
+					uniques: [...uqGroups.values()].map((columnNames) => ({
+						columnNames,
+					})),
 					indices: [...idxGroups.entries()].map(([name, columnNames]) => ({
 						name,
 						columnNames,

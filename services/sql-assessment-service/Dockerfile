@@ -23,6 +23,8 @@ WORKDIR /app
 
 COPY --from=build /app/build/ ./build/
 COPY --from=build /app/node_modules/@electric-sql/pglite ./node_modules/@electric-sql/pglite
+COPY --from=build /app/node_modules/swagger-ui-express ./node_modules/swagger-ui-express
+COPY --from=build /app/node_modules/swagger-ui-dist ./node_modules/swagger-ui-dist
 
 EXPOSE 3000
 
