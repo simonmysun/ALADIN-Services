@@ -60,6 +60,16 @@ async function readStdin(): Promise<string> {
 }
 
 /**
+ * Returns the index of the -f / --file flag in args, giving -f priority over
+ * --file when both are present.  Returns -1 when neither flag is present.
+ */
+export function resolveFileFlag(args: string[]): number {
+	const shortIdx = args.indexOf('-f');
+	if (shortIdx !== -1) return shortIdx;
+	return args.indexOf('--file');
+}
+
+/**
  * Resolves the --init-sql-file flag value from the raw CLI args.
  * Throws if the flag is present but not followed by a non-flag argument,
  * so the caller can surface a clear error instead of silently ignoring it.
@@ -114,7 +124,7 @@ async function main() {
 
 	// ── Resolve request body ─────────────────────────────────────────────
 	let body: unknown;
-	const fileIdx = Math.max(args.indexOf('-f'), args.indexOf('--file'));
+	const fileIdx = resolveFileFlag(args);
 
 	if (args.includes('--stdin')) {
 		body = JSON.parse(await readStdin());
