@@ -1,5 +1,34 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
+
+// ---------------------------------------------------------------------------
+// Module-level mocks (hoisted by vitest)
+//
+// connectToDatabase – return true without touching a real PG server.
+// DataSource        – stub destroy() so the catch block does not throw on an
+//                     uninitialised pool.
+// The synchronous factory avoids async-hoisting edge cases in vitest v4.
+// ---------------------------------------------------------------------------
+vi.mock('../../src/shared/utils/database-utils', () => ({
+	generateDatabaseKey: (host: string, port: number, schema: string) =>
+		`${host}:${port}/${schema}`,
+	generatePGliteKey: (id: string) => `pglite:${id}`,
+	connectToDatabase: vi.fn().mockResolvedValue(true),
+	makeRowQueryFn: vi.fn(),
+	createQueryRunner: vi.fn(),
+	buildAliasMapFromTables: vi.fn(),
+}));
+
+vi.mock('typeorm', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('typeorm')>();
+	return {
+		...actual,
+		DataSource: vi.fn(function (this: Record<string, unknown>) {
+			this.initialize = vi.fn().mockResolvedValue(undefined);
+			this.destroy = vi.fn().mockResolvedValue(undefined);
+		}),
+	};
+});
 import { QueryExecutionController } from '../../src/query/query-execution-controller';
 import {
 	QueryExecutionService,
@@ -152,20 +181,16 @@ describe('QueryExecutionController', () => {
 				new QueryExecutionError('Query must not be empty.', 'EMPTY_QUERY'),
 			);
 			const { res, status, json } = mockRes();
-			// Bypass DB connection by pre-seeding metadata and mocking connectToDatabase
-			// The connection will fail because there is no real PG server, so we spy on
-			// the service directly and test the error→status mapping logic.
-			//
-			// We need connectToDatabase to succeed — mock at the module level via
-			// the service spy path: simulate that the service itself is called
-			// (meaning connection succeeded) and it throws.
-			//
-			// For isolation we test the mapping through a separate helper.
-			const error = new QueryExecutionError(
-				'Query must not be empty.',
-				'EMPTY_QUERY',
+
+			await controller.executeQuery(
+				mockReq({ connectionInfo: VALID_CONNECTION, query: 'SELECT 1' }),
+				res,
 			);
-			expect(error.code).toBe('EMPTY_QUERY');
+
+			expect(status).toHaveBeenCalledWith(400);
+			expect(json).toHaveBeenCalledWith(
+				expect.objectContaining({ code: 'EMPTY_QUERY' }),
+			);
 		});
 
 		it('returns 400 for NON_SELECT errors reported by the service', async () => {
