@@ -84,6 +84,29 @@ export function resolveInitSqlFile(args: string[]): string | undefined {
 	return path.resolve(value);
 }
 
+/** Flags that consume the following token as their value. */
+const FLAGS_WITH_VALUES = new Set(['--init-sql-file', '-f', '--file']);
+
+/**
+ * Scans args (from index 1, after the command) and returns the first token
+ * that is neither a flag nor the value of a flag that takes a value.
+ * Returns undefined when no such positional argument exists.
+ */
+export function resolvePositionalBody(args: string[]): string | undefined {
+	let i = 1; // skip args[0] (the command)
+	while (i < args.length) {
+		const arg = args[i];
+		if (FLAGS_WITH_VALUES.has(arg)) {
+			i += 2; // skip flag + its value
+		} else if (arg.startsWith('-')) {
+			i += 1; // skip boolean flag
+		} else {
+			return arg;
+		}
+	}
+	return undefined;
+}
+
 async function main() {
 	const args = process.argv.slice(2);
 
@@ -128,19 +151,25 @@ async function main() {
 
 	if (args.includes('--stdin')) {
 		body = JSON.parse(await readStdin());
-	} else if (fileIdx !== -1 && args[fileIdx + 1]) {
-		body = JSON.parse(
-			fs.readFileSync(path.resolve(args[fileIdx + 1]), 'utf-8'),
-		);
-	} else if (args[1] && !args[1].startsWith('-')) {
-		body = JSON.parse(args[1]);
-	} else if (!process.stdin.isTTY) {
-		body = JSON.parse(await readStdin());
+	} else if (fileIdx !== -1) {
+		const filePath = args[fileIdx + 1];
+		if (!filePath || filePath.startsWith('-')) {
+			console.error('-f/--file requires a path argument.');
+			process.exit(1);
+		}
+		body = JSON.parse(fs.readFileSync(path.resolve(filePath), 'utf-8'));
 	} else {
-		console.error(
-			'No input provided. Use -f <file>, --stdin, or pass JSON as an argument.',
-		);
-		process.exit(1);
+		const positional = resolvePositionalBody(args);
+		if (positional !== undefined) {
+			body = JSON.parse(positional);
+		} else if (!process.stdin.isTTY) {
+			body = JSON.parse(await readStdin());
+		} else {
+			console.error(
+				'No input provided. Use -f <file>, --stdin, or pass JSON as an argument.',
+			);
+			process.exit(1);
+		}
 	}
 
 	const result = await invokeHandler(route.handler, body);
