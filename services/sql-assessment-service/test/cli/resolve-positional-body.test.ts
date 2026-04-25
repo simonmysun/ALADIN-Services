@@ -11,9 +11,7 @@ describe('resolvePositionalBody', () => {
 	});
 
 	it('returns undefined when all args are flags', () => {
-		expect(
-			resolvePositionalBody(['query:execute', '--stdin']),
-		).toBeUndefined();
+		expect(resolvePositionalBody(['query:execute', '--stdin'])).toBeUndefined();
 		expect(
 			resolvePositionalBody(['query:execute', '--list', '--help']),
 		).toBeUndefined();
