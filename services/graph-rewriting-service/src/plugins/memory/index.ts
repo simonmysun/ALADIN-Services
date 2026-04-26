@@ -33,7 +33,7 @@ const memoryConnector: FastifyPluginAsync = async (
 		null
 	);
 
-	fastify.addHook('onRequest', (request, reply, done) => {
+	fastify.addHook('onRequest', (request, _reply, done) => {
 		// All requests share the same in-memory graph instance
 		request.dbGraphService = graphService;
 		done();
