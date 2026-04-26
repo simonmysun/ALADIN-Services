@@ -85,7 +85,7 @@ export class DatabaseService {
 
 		if (connectionInfo.type === 'pglite') {
 			// Resolve sqlContent: use the value from the request body first.
-			let sqlContent: string | undefined = connectionInfo.sqlContent;
+			const sqlContent: string | undefined = connectionInfo.sqlContent;
 
 			// Distinguish "absent" (null/undefined) from "present but invalid"
 			// (e.g. empty string). An explicitly-supplied empty string is not
